@@ -1,0 +1,56 @@
+{
+  "name": "typegraph",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "tg": "./dist/cli.js",
+    "typegraph": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli/cli.ts",
+    "dev:mock": "tsx src/cli/cli.ts show playground/mock-codebase",
+    "dev:mock:agent": "tsx src/cli/cli.ts show playground/mock-codebase/src/agent",
+    "export:mock": "tsx src/cli/cli.ts export playground/mock-codebase --out .tmp/mock-typegraph.json",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web && npm run typecheck:test",
+    "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
+    "typecheck:web": "tsc -p tsconfig.web.json --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest",
+    "clean": "rimraf dist .tmp",
+    "build": "npm run clean && npm run typecheck && npm run build:web && npm run build:node",
+    "build:web": "vite build",
+    "build:node": "tsc -p tsconfig.node.json",
+    "start": "node dist/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/static": "^9.1.3",
+    "@xyflow/react": "^12.11.0",
+    "chokidar": "^5.0.0",
+    "fastify": "^5.8.5",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "ts-morph": "^28.0.0",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "rimraf": "^6.1.3",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9"
+  }
+}
