@@ -5,7 +5,7 @@ This is a Node + React TS project. TypeGraph, a local developer tool for explori
 mental model:
   ├─ strict TypeScript everywhere
   ├─ ESM everywhere
-  ├─ tsc builds CLI/backend/core into dist/cli.js
+  ├─ tsc compiles CLI/backend/core into dist with dist/cli.js as the bin entrypoint
   ├─ Vite builds React GUI into dist/web
   └─ npm bin exposes tg → dist/cli.js
 

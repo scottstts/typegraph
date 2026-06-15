@@ -123,20 +123,29 @@ Use:
 npm
 TypeScript strict mode
 ESM
-tsc for Node CLI/backend bundle
-Vite for React GUI bundle
+tsc for Node CLI/backend compilation
+Vite for React GUI build and development serving
 React for GUI
 React Flow for graph canvas
 ts-morph for TypeScript analysis
 Fastify for local server
 Vitest for tests
+ESLint for linting
 ```
+
+Node code should be compiled with `tsc`, not bundled with `tsup` or another bundler unless that choice is explicitly revisited.
+
+Keep a thin root CLI entrypoint at `src/cli.ts` so `tsc` emits `dist/cli.js` for npm bin usage. The implementation modules should compile alongside it under `dist/cli`, `dist/server`, `dist/core`, and `dist/shared`.
 
 Expected final build output:
 
 ```txt
 dist/
 ├─ cli.js
+├─ cli/
+├─ server/
+├─ core/
+├─ shared/
 └─ web/
    ├─ index.html
    └─ assets/
@@ -159,6 +168,8 @@ tg show ./src
 
 the CLI starts a local server, serves `dist/web`, and provides graph data through local API routes.
 
+During source development, commands run through `tsx src/cli.ts`. In that mode `tg show` should not require `dist/web` to exist. It should start the local API server and serve or proxy the React GUI through Vite dev serving, then print the GUI URL. Built commands run through `node dist/cli.js` and serve `dist/web`.
+
 ---
 
 ## 4. Repository structure
@@ -180,6 +191,8 @@ typegraph/
 ├─ index.html
 │
 ├─ src/
+│  ├─ cli.ts
+│  │
 │  ├─ cli/
 │  │  ├─ cli.ts
 │  │  ├─ commands/
@@ -275,13 +288,13 @@ typegraph/
 │        ├─ domain/
 │        │  ├─ primitives.ts
 │        │  ├─ users.ts
-│        │  ├─ assets.ts
-│        │  └─ messages.ts
-│        ├─ agent/
-│        │  ├─ request.ts
-│        │  ├─ response.ts
-│        │  ├─ provider.ts
-│        │  └─ loop.ts
+│        │  └─ addresses.ts
+│        ├─ catalog/
+│        │  ├─ products.ts
+│        │  └─ inventory.ts
+│        ├─ orders/
+│        │  ├─ cart.ts
+│        │  └─ checkout.ts
 │        └─ app/
 │           ├─ state.ts
 │           └─ commands.ts
@@ -291,6 +304,10 @@ typegraph/
 │
 └─ dist/
    ├─ cli.js
+   ├─ cli/
+   ├─ server/
+   ├─ core/
+   ├─ shared/
    └─ web/
       ├─ index.html
       └─ assets/
@@ -302,7 +319,7 @@ typegraph/
 
 ## 5. Directory responsibilities
 
-### `src/cli`
+### `src/cli` and `src/cli.ts`
 
 Owns the command-line interface.
 
@@ -321,7 +338,7 @@ Main commands:
 
 ```bash
 tg show
-tg show ./src/agents
+tg show ./src/orders
 tg index
 tg export --out typegraph.json
 ```
@@ -329,12 +346,15 @@ tg export --out typegraph.json
 Suggested files:
 
 ```txt
+src/cli.ts
 src/cli/cli.ts
 src/cli/commands/show.ts
 src/cli/commands/index.ts
 src/cli/commands/export.ts
 src/cli/resolveCliOptions.ts
 ```
+
+`src/cli.ts` is the thin bin entrypoint that compiles to `dist/cli.js`. Most CLI implementation should live under `src/cli/`.
 
 ---
 
@@ -344,7 +364,8 @@ Owns the local HTTP server used by `tg show`.
 
 Responsibilities:
 
-* serve the built GUI from `dist/web`
+* serve the GUI from Vite during source development
+* serve the built GUI from `dist/web` after `npm run build`
 * expose graph API endpoints
 * expose selected node/source endpoints
 * manage watch mode
@@ -356,7 +377,7 @@ Suggested API endpoints:
 GET /api/project
 GET /api/graph
 GET /api/node/:id
-GET /api/search?q=AgentRequest
+GET /api/search?q=CheckoutInput
 GET /api/neighborhood?nodeId=...&depth=1&direction=both
 POST /api/scope
 ```
@@ -516,7 +537,7 @@ Manual workflows:
 
 ```bash
 npm run dev:mock
-npm run dev:mock:agent
+npm run dev:mock:orders
 npm run export:mock
 tg show playground/mock-codebase
 ```
@@ -532,19 +553,20 @@ Recommended scripts:
 ```json
 {
   "scripts": {
-    "dev": "tsx src/cli/cli.ts",
-    "dev:mock": "tsx src/cli/cli.ts show playground/mock-codebase",
-    "dev:mock:agent": "tsx src/cli/cli.ts show playground/mock-codebase/src/agent",
-    "export:mock": "tsx src/cli/cli.ts export playground/mock-codebase --out .tmp/mock-typegraph.json",
+    "dev": "tsx src/cli.ts",
+    "dev:mock": "tsx src/cli.ts show playground/mock-codebase",
+    "dev:mock:orders": "tsx src/cli.ts show playground/mock-codebase/src/orders",
+    "export:mock": "tsx src/cli.ts export playground/mock-codebase --out .tmp/mock-typegraph.json",
 
     "typecheck": "npm run typecheck:node && npm run typecheck:web && npm run typecheck:test",
     "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
     "typecheck:web": "tsc -p tsconfig.web.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
 
+    "lint": "eslint . --max-warnings=0",
     "test": "vitest",
     "clean": "rimraf dist .tmp",
-    "build": "npm run clean && npm run typecheck && npm run build:web && npm run build:node",
+    "build": "npm run clean && npm run lint && npm run typecheck && npm run build:web && npm run build:node",
     "build:web": "vite build",
     "build:node": "tsc -p tsconfig.node.json",
     "start": "node dist/cli.js"
@@ -573,7 +595,7 @@ npm run dev:mock
 ### Run scoped mock graph
 
 ```bash
-npm run dev:mock:agent
+npm run dev:mock:orders
 ```
 
 ### Run arbitrary project
@@ -598,6 +620,12 @@ npm test
 
 ```bash
 npm run typecheck
+```
+
+### Lint
+
+```bash
+npm run lint
 ```
 
 ### Build
@@ -626,6 +654,8 @@ Unlink later:
 ```bash
 npm unlink -g typegraph
 ```
+
+`vite.config.ts` should set the production output directory to `dist/web`. Make sure Vite does not delete compiled Node output if the build order is changed later.
 
 ---
 
@@ -661,7 +691,7 @@ Serving explorer at http://localhost:4321
 ### `tg show <path>`
 
 ```bash
-tg show ./src/agents
+tg show ./src/orders
 ```
 
 This should still index the full project so cross-file type resolution works, but initialize the GUI with the selected directory scope.
@@ -863,9 +893,9 @@ type TypeGraphEdge = {
 Example edges:
 
 ```txt
-AgentRequest -> AgentConversationMessage via conversationMessages
-AgentRequest -> AgentImageAttachment via imageAttachments
-AgentRequest -> CompiledManifestPrompt via prompt
+CheckoutInput -> CartSnapshot via cart
+CheckoutInput -> UserProfile via customer
+CheckoutInput -> RequestContext via context
 TypeB -> string via arg1
 TypeB -> number via arg2
 TypeB -> TypeA via return
@@ -920,16 +950,16 @@ Result -> Failure
 Handle intersections:
 
 ```ts
-type AgentLoopInput = AgentRequest & {
-  providerState: ProviderRequestState;
+type CheckoutInput = CartSnapshot & {
+  customer: UserProfile;
 };
 ```
 
 Extract:
 
 ```txt
-AgentLoopInput -> AgentRequest
-AgentLoopInput.providerState -> ProviderRequestState
+CheckoutInput -> CartSnapshot
+CheckoutInput.customer -> UserProfile
 ```
 
 ---
@@ -1056,10 +1086,10 @@ Prefer source-level declaration text over huge compiler-expanded anonymous types
 Bad inspector output:
 
 ```ts
-type AgentRequest = {
-  conversationMessages?: readonly {
-    role: "user" | "assistant";
-    content: string;
+type CheckoutInput = {
+  cart?: {
+    id: CartId;
+    items: readonly CartItem[];
   }[];
 }
 ```
@@ -1067,8 +1097,8 @@ type AgentRequest = {
 Good inspector output:
 
 ```ts
-type AgentRequest = {
-  conversationMessages?: readonly AgentConversationMessage[] | undefined;
+type CheckoutInput = {
+  cart?: CartSnapshot | undefined;
 }
 ```
 
@@ -1101,14 +1131,14 @@ What the GUI initially shows or filters to.
 Example:
 
 ```bash
-tg show ./src/agents
+tg show ./src/orders
 ```
 
 This should:
 
 ```txt
 Index full project
-Set initial view scope to ./src/agents
+Set initial view scope to ./src/orders
 ```
 
 Nodes outside the scope can still appear if they are dependencies of in-scope nodes. Style them as outside current scope.
@@ -1156,8 +1186,8 @@ Include:
 Search result item should show:
 
 ```txt
-AgentRequest
-type alias · src/agent/request.ts:12
+CheckoutInput
+type alias · src/orders/checkout.ts:12
 depends on 5 · used by 3
 ```
 
@@ -1191,7 +1221,7 @@ Allow expansion:
 Each node card should show:
 
 ```txt
-AgentRequest
+CheckoutInput
 type alias
 8 members
 depends on 5
@@ -1201,10 +1231,9 @@ used by 4
 Edges should show labels where useful:
 
 ```txt
-conversationMessages
-imageAttachments
-prompt
-providerState
+cart
+customer
+context
 return
 arg1
 ```
@@ -1247,7 +1276,7 @@ Suggested endpoints:
 GET /api/project
 GET /api/graph
 GET /api/node/:id
-GET /api/search?q=AgentRequest
+GET /api/search?q=CheckoutInput
 GET /api/neighborhood?nodeId=...&depth=1&direction=both
 POST /api/scope
 GET /api/source?nodeId=...
@@ -1308,7 +1337,9 @@ primitive aliases
   ↓
 domain models
   ↓
-agent request/response/provider types
+catalog and inventory models
+  ↓
+cart and checkout types
   ↓
 app state / command types
 ```
@@ -1318,11 +1349,11 @@ Example files:
 ```txt
 playground/mock-codebase/src/domain/primitives.ts
 playground/mock-codebase/src/domain/users.ts
-playground/mock-codebase/src/domain/assets.ts
-playground/mock-codebase/src/agent/provider.ts
-playground/mock-codebase/src/agent/request.ts
-playground/mock-codebase/src/agent/response.ts
-playground/mock-codebase/src/agent/loop.ts
+playground/mock-codebase/src/domain/addresses.ts
+playground/mock-codebase/src/catalog/products.ts
+playground/mock-codebase/src/catalog/inventory.ts
+playground/mock-codebase/src/orders/cart.ts
+playground/mock-codebase/src/orders/checkout.ts
 playground/mock-codebase/src/app/state.ts
 playground/mock-codebase/src/app/commands.ts
 ```
@@ -1334,15 +1365,17 @@ The mock codebase should include:
 * interfaces
 * imported type references
 * function type aliases
-* provider request/response types
 * nested domain models
 * union types
 * intersection types
+* enums
 * arrays
 * readonly arrays
 * optional properties
 * external types like `AbortSignal`
 * a few generic wrapper types if easy
+
+The mock domain itself is not important. Keep it small, generic, and designed only to exercise TypeGraph behavior. Do not encode assumptions from another real project into the playground.
 
 Important:
 
@@ -1372,8 +1405,11 @@ import { mockTypes } from "../../playground/mock-codebase";
 
 ```ts
 export type UserId = string;
-export type AssetId = string;
+export type ProductId = string;
+export type CartId = string;
+export type OrderId = string;
 export type ISODateString = string;
+export type MoneyCents = number;
 
 export type JsonValue =
   | string
@@ -1388,102 +1424,151 @@ export type JsonValue =
 
 ```ts
 import type { UserId, ISODateString } from "./primitives";
+import type { PostalAddress } from "./addresses";
 
 export type UserProfile = {
   id: UserId;
   name: string;
+  email?: string;
+  defaultAddress?: PostalAddress;
   createdAt: ISODateString;
 };
 ```
 
-### `domain/assets.ts`
+### `domain/addresses.ts`
 
 ```ts
-import type { AssetId, ISODateString, JsonValue } from "./primitives";
-import type { UserProfile } from "./users";
+export interface PostalAddress {
+  line1: string;
+  line2?: string;
+  city: string;
+  countryCode: string;
+  postalCode: string;
+}
+```
 
-export type AssetMetadata = {
-  id: AssetId;
-  owner: UserProfile;
-  createdAt: ISODateString;
-  tags: readonly string[];
+### `catalog/products.ts`
+
+```ts
+import type { ProductId, MoneyCents, JsonValue } from "../domain/primitives";
+
+export enum ProductStatus {
+  Draft = "draft",
+  Active = "active",
+  Archived = "archived",
+}
+
+export type ProductVariant = {
+  sku: string;
+  label: string;
+  price: MoneyCents;
+  metadata?: JsonValue;
 };
 
-export type AssetSnapshot = {
-  metadata: AssetMetadata;
-  content: JsonValue;
+export type ProductRecord = {
+  id: ProductId;
+  title: string;
+  status: ProductStatus;
+  variants: readonly ProductVariant[];
+  tags?: readonly string[];
 };
 ```
 
-### `agent/provider.ts`
+### `catalog/inventory.ts`
 
 ```ts
-export type AgentConversationRole = "user" | "assistant" | "system";
+import type { ProductId } from "../domain/primitives";
 
-export type AgentConversationMessage = {
-  role: AgentConversationRole;
-  content: string;
+export type InventoryLocation = "warehouse" | "storefront" | "supplier";
+
+export interface InventoryRecord {
+  productId: ProductId;
+  available: number;
+  reserved: number;
+  location: InventoryLocation;
+}
+```
+
+### `orders/cart.ts`
+
+```ts
+import type { CartId, ProductId, MoneyCents, ISODateString } from "../domain/primitives";
+import type { ProductRecord } from "../catalog/products";
+
+export type CartItem = {
+  productId: ProductId;
+  product: ProductRecord;
+  quantity: number;
+  unitPrice: MoneyCents;
 };
 
-export type AgentImageAttachment = {
-  id: string;
-  mimeType: "image/png" | "image/jpeg" | "image/webp";
-  dataUrl: string;
-};
-
-export type ProviderRequestState = {
-  provider: "openai" | "anthropic" | "gemini";
-  modelId: string;
-  sessionId?: string | null;
+export type CartSnapshot = {
+  id: CartId;
+  items: readonly CartItem[];
+  updatedAt: ISODateString;
 };
 ```
 
-### `agent/request.ts`
+### `orders/checkout.ts`
 
 ```ts
-import type { AssetSnapshot } from "../domain/assets";
-import type { AgentConversationMessage, AgentImageAttachment } from "./provider";
+import type { OrderId, ISODateString } from "../domain/primitives";
+import type { UserProfile } from "../domain/users";
+import type { CartSnapshot } from "./cart";
 
-export type AgentRequest = {
-  conversationMessages?: readonly AgentConversationMessage[] | undefined;
-  imageAttachments?: readonly AgentImageAttachment[] | undefined;
-  selectedAsset?: AssetSnapshot | null;
-  prompt: string;
-  previousResponseId?: string | null;
+export interface RequestContext {
+  requestId: string;
   signal?: AbortSignal;
+  referrer?: URL;
+}
+
+export type CheckoutInput = CartSnapshot & {
+  customer: UserProfile;
+  context: RequestContext;
 };
-```
 
-### `agent/response.ts`
-
-```ts
-import type { AssetSnapshot } from "../domain/assets";
-
-export type AgentSuccessResponse = {
+export type CheckoutSuccess = {
   ok: true;
-  asset: AssetSnapshot;
+  orderId: OrderId;
+  placedAt: ISODateString;
 };
 
-export type AgentFailureResponse = {
+export type CheckoutFailure = {
   ok: false;
-  error: string;
+  reason: "payment_failed" | "out_of_stock" | "invalid_cart";
 };
 
-export type AgentResponse = AgentSuccessResponse | AgentFailureResponse;
+export type CheckoutResult = CheckoutSuccess | CheckoutFailure;
+
+export type CheckoutHandler = (input: CheckoutInput) => Promise<CheckoutResult>;
 ```
 
-### `agent/loop.ts`
+### `app/state.ts`
 
 ```ts
-import type { AgentRequest } from "./request";
-import type { AgentResponse } from "./response";
-import type { ProviderRequestState } from "./provider";
+import type { UserProfile } from "../domain/users";
+import type { ProductRecord } from "../catalog/products";
+import type { CartSnapshot } from "../orders/cart";
+import type { CheckoutResult } from "../orders/checkout";
 
-export type AgentLoopInput = AgentRequest & {
-  providerState: ProviderRequestState;
+export type StoreState = {
+  currentUser?: UserProfile;
+  catalog: readonly ProductRecord[];
+  cart?: CartSnapshot;
+  lastCheckout?: CheckoutResult;
 };
+```
 
-export type AgentLoopHandler = (input: AgentLoopInput) => Promise<AgentResponse>;
+### `app/commands.ts`
+
+```ts
+import type { ProductId } from "../domain/primitives";
+import type { CheckoutInput } from "../orders/checkout";
+
+export type StoreCommand =
+  | { type: "addItem"; productId: ProductId; quantity: number }
+  | { type: "removeItem"; productId: ProductId }
+  | { type: "checkout"; input: CheckoutInput };
 ```
 
 ---
@@ -1650,24 +1735,25 @@ npm run dev:mock
 Check:
 
 1. GUI opens locally.
-2. Search for `AgentRequest`.
+2. Search for `CheckoutInput`.
 3. Inspector shows one-level shape.
-4. `AgentConversationMessage` is clickable.
-5. `AgentImageAttachment` is clickable.
-6. `AssetSnapshot` is clickable.
+4. `CartSnapshot` is clickable.
+5. `UserProfile` is clickable.
+6. `RequestContext` is clickable.
 7. `AbortSignal` appears as external, not project-local.
-8. Graph shows direct dependencies of `AgentRequest`.
-9. Graph shows direct dependents of `AgentRequest`, such as `AgentLoopInput`.
-10. Search for `JsonValue`.
-11. Union/recursive-ish shape does not crash extractor.
-12. Search for `AgentLoopHandler`.
-13. Function params and return type appear as edges.
-14. Running scoped command against `src/agent` starts with agent types but still resolves dependencies in `domain`.
-15. Primitives are hidden by default but can be shown if toggle exists.
-16. `npm run export:mock` writes graph JSON.
-17. `npm run build` succeeds.
-18. `npm run start -- show playground/mock-codebase` works after build.
-19. `npm link` then `tg show playground/mock-codebase` works.
+8. `URL` appears as external, not project-local.
+9. Graph shows direct dependencies of `CheckoutInput`.
+10. Graph shows direct dependents of `CheckoutInput`, such as `StoreCommand`.
+11. Search for `JsonValue`.
+12. Union/recursive-ish shape does not crash extractor.
+13. Search for `CheckoutHandler`.
+14. Function params and return type appear as edges.
+15. Running scoped command against `src/orders` starts with order types but still resolves dependencies in `domain` and `catalog`.
+16. Primitives are hidden by default but can be shown if toggle exists.
+17. `npm run export:mock` writes graph JSON.
+18. `npm run build` succeeds.
+19. `npm run start -- show playground/mock-codebase` works after build.
+20. `npm link` then `tg show playground/mock-codebase` works.
 
 ---
 
@@ -1795,6 +1881,7 @@ Implement in this order:
 
 20. Add build scripts:
 
+    * lint
     * typecheck
     * build:web
     * build:node
@@ -1822,39 +1909,42 @@ The implementation is acceptable when:
 
 1. `npm run dev:mock` launches the GUI against the mock codebase.
 
-2. `npm run dev:mock:agent` launches the GUI scoped to the mock agent folder.
+2. `npm run dev:mock:orders` launches the GUI scoped to the mock orders folder.
 
 3. `npm run export:mock` writes graph JSON.
 
 4. `npm test` passes fixture tests.
 
-5. `npm run typecheck` passes.
+5. `npm run lint` passes.
 
-6. `npm run build` produces:
+6. `npm run typecheck` passes.
+
+7. `npm run build` produces:
 
    * `dist/cli.js`
+   * compiled Node support files under `dist/cli`, `dist/server`, `dist/core`, and `dist/shared`
    * `dist/web/index.html`
    * `dist/web/assets/*`
 
-7. `node dist/cli.js show playground/mock-codebase` works.
+8. `node dist/cli.js show playground/mock-codebase` works.
 
-8. `tg show playground/mock-codebase` works after `npm link`.
+9. `tg show playground/mock-codebase` works after `npm link`.
 
-9. The mock codebase can be deleted without breaking TypeGraph source build.
+10. The mock codebase can be deleted without breaking TypeGraph source build.
 
-10. The mock codebase is excluded from TypeGraph’s own TypeScript build.
+11. The mock codebase is excluded from TypeGraph’s own TypeScript build.
 
-11. The GUI can inspect `AgentRequest`.
+12. The GUI can inspect `CheckoutInput`.
 
-12. The GUI can click referenced types.
+13. The GUI can click referenced types.
 
-13. The GUI can navigate dependencies and dependents.
+14. The GUI can navigate dependencies and dependents.
 
-14. The inspector shows one-level declared shape, not recursive expanded blobs.
+15. The inspector shows one-level declared shape, not recursive expanded blobs.
 
-15. Primitives and external types are handled without overwhelming the default graph view.
+16. Primitives and external types are handled without overwhelming the default graph view.
 
-16. `tg show <path>` indexes the full project but starts with the selected path as view scope.
+17. `tg show <path>` indexes the full project but starts with the selected path as view scope.
 
 ---
 
@@ -1871,7 +1961,7 @@ runs CLI through tsx
   ↓
 indexes playground/mock-codebase
   ↓
-serves local GUI
+serves local GUI through Vite dev serving
   ↓
 developer manually verifies graph behavior
 ```
