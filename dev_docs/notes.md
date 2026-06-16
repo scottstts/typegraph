@@ -6,3 +6,5 @@
 - The extractor intentionally uses authored declaration text for `displayText` and records edges separately; do not replace inspector text with compiler-expanded type text.
 - Dev `show` starts Fastify for API plus a Vite dev server that proxies `/api`; built `show` serves `dist/web` from Fastify. Watch mode currently does full re-index with SSE notification.
 - TypeGraph must follow TypeScript solution/project-reference configs. A root `tsconfig.json` with `"files": []` and `references` should load referenced configs into one ts-morph project instead of indexing zero files.
+- GUI graph view is now a whole-filtered-graph canvas, not a selected-node neighborhood. Keep nodes abstract/dot-based with hover notes for names/counts; inspector starts empty until the user selects a node, and blank canvas clicks clear selection.
+- GUI filters default to excluding test/spec/regression paths and local orphan declaration nodes. An orphan is a local declared node with no incoming type references and no dependencies on other local declared nodes; primitive/external-only dependencies still count as orphan.

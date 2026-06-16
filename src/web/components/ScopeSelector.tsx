@@ -53,19 +53,21 @@ export function ScopeSelector() {
   return (
     <label className="field">
       <span>Scope</span>
-      <select
-        value={currentValue}
-        onChange={(event) => {
-          const value = event.currentTarget.value;
-          void applyScope(value === "" ? undefined : value);
-        }}
-      >
-        {options.map((option) => (
-          <option key={option.value ?? "all"} value={option.value ?? ""}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+      <span className="select-wrap">
+        <select
+          value={currentValue}
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            void applyScope(value === "" ? undefined : value);
+          }}
+        >
+          {options.map((option) => (
+            <option key={option.value ?? "all"} value={option.value ?? ""}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </span>
     </label>
   );
 }

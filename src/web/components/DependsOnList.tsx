@@ -1,4 +1,5 @@
 import type { TypeGraphNode, TypeGraphPayload } from "../../shared/graphTypes.js";
+import { kindLabel } from "../graphUi.js";
 import { useGraphStore } from "../state/graphStore.js";
 
 type NodeListProps = {
@@ -31,7 +32,7 @@ function LinkedNodeList({
         return (
           <button key={id} type="button" onClick={() => selectNode(id)}>
             <strong>{linkedNode.name}</strong>
-            <span>{linkedNode.kind}</span>
+            <span>{kindLabel(linkedNode.kind)}</span>
           </button>
         );
       })}
@@ -46,4 +47,3 @@ export function DependsOnList({ graph, node }: NodeListProps) {
 export function DependedOnByList({ graph, node }: NodeListProps) {
   return <LinkedNodeList ids={node.dependedOnBy} graph={graph} />;
 }
-

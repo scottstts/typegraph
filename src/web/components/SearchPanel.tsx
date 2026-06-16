@@ -1,37 +1,20 @@
 import { useMemo } from "react";
 import type { TypeGraphNode } from "../../shared/graphTypes.js";
+import {
+  kindLabel,
+  nodeMatchesFilters,
+  projectDirectoryName,
+  usageLabel
+} from "../graphUi.js";
 import { useGraphStore, type KindFilters } from "../state/graphStore.js";
 import { ScopeSelector } from "./ScopeSelector.js";
 
-function nodeMatchesKind(node: TypeGraphNode, kindFilters: KindFilters): boolean {
-  if (node.kind === "primitive" || node.kind === "external") {
-    return true;
-  }
-
-  return kindFilters[node.kind];
-}
-
 function nodeSubtitle(node: TypeGraphNode): string {
-  const kind = node.kind === "typeAlias" ? "type alias" : node.kind;
   const location =
     node.relativeFilePath === undefined
       ? ""
       : ` · ${node.relativeFilePath}${node.startLine === undefined ? "" : `:${node.startLine}`}`;
-  return `${kind}${location}`;
-}
-
-function isNodeInScope(node: TypeGraphNode, scopePath: string | undefined): boolean {
-  if (scopePath === undefined) {
-    return true;
-  }
-
-  if (!node.isProjectLocal || node.filePath === undefined) {
-    return false;
-  }
-
-  const scope = scopePath.replaceAll("\\", "/").replace(/\/$/, "");
-  const filePath = node.filePath.replaceAll("\\", "/");
-  return filePath === scope || filePath.startsWith(`${scope}/`);
+  return `${kindLabel(node.kind)}${location}`;
 }
 
 export function SearchPanel() {
@@ -41,15 +24,15 @@ export function SearchPanel() {
   const showPrimitives = useGraphStore((state) => state.showPrimitives);
   const showExternal = useGraphStore((state) => state.showExternal);
   const exportedOnly = useGraphStore((state) => state.exportedOnly);
-  const currentDirectoryOnly = useGraphStore((state) => state.currentDirectoryOnly);
+  const excludeTests = useGraphStore((state) => state.excludeTests);
+  const excludeOrphans = useGraphStore((state) => state.excludeOrphans);
   const kindFilters = useGraphStore((state) => state.kindFilters);
   const setSearchQuery = useGraphStore((state) => state.setSearchQuery);
   const setShowPrimitives = useGraphStore((state) => state.setShowPrimitives);
   const setShowExternal = useGraphStore((state) => state.setShowExternal);
   const setExportedOnly = useGraphStore((state) => state.setExportedOnly);
-  const setCurrentDirectoryOnly = useGraphStore(
-    (state) => state.setCurrentDirectoryOnly
-  );
+  const setExcludeTests = useGraphStore((state) => state.setExcludeTests);
+  const setExcludeOrphans = useGraphStore((state) => state.setExcludeOrphans);
   const toggleKind = useGraphStore((state) => state.toggleKind);
   const selectNode = useGraphStore((state) => state.selectNode);
 
@@ -58,36 +41,23 @@ export function SearchPanel() {
       return [];
     }
 
-    const query = searchQuery.trim().toLowerCase();
     return graph.nodes
-      .filter((node) => {
-        if (node.kind === "primitive" && !showPrimitives) {
-          return false;
-        }
-        if (node.kind === "external" && !showExternal) {
-          return false;
-        }
-        if (exportedOnly && !node.exported) {
-          return false;
-        }
-        if (currentDirectoryOnly && !isNodeInScope(node, graph.scopePath)) {
-          return false;
-        }
-        if (!nodeMatchesKind(node, kindFilters)) {
-          return false;
-        }
-        if (query === "") {
-          return node.isProjectLocal;
-        }
-        return (
-          node.name.toLowerCase().includes(query) ||
-          (node.relativeFilePath?.toLowerCase().includes(query) ?? false)
-        );
-      })
+      .filter((node) =>
+        nodeMatchesFilters(node, graph, {
+          searchQuery,
+          showPrimitives,
+          showExternal,
+          exportedOnly,
+          excludeTests,
+          excludeOrphans,
+          kindFilters
+        })
+      )
       .sort((a, b) => a.name.localeCompare(b.name))
       .slice(0, 120);
   }, [
-    currentDirectoryOnly,
+    excludeOrphans,
+    excludeTests,
     exportedOnly,
     graph,
     kindFilters,
@@ -100,7 +70,7 @@ export function SearchPanel() {
     <aside className="panel left-panel">
       <div className="brand-block">
         <h1>TypeGraph</h1>
-        <p>{graph?.projectRoot ?? "Loading project"}</p>
+        <p>{graph === undefined ? "Loading project" : projectDirectoryName(graph.projectRoot)}</p>
       </div>
 
       <label className="field">
@@ -114,54 +84,61 @@ export function SearchPanel() {
 
       <ScopeSelector />
 
-      <div className="filter-grid" aria-label="Graph filters">
-        <label>
-          <input
-            type="checkbox"
-            checked={showPrimitives}
-            onChange={(event) => setShowPrimitives(event.currentTarget.checked)}
-          />
-          primitives
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={showExternal}
-            onChange={(event) => setShowExternal(event.currentTarget.checked)}
-          />
-          external
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={exportedOnly}
-            onChange={(event) => setExportedOnly(event.currentTarget.checked)}
-          />
-          exported
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={currentDirectoryOnly}
-            onChange={(event) =>
-              setCurrentDirectoryOnly(event.currentTarget.checked)
-            }
-          />
-          current dir
-        </label>
+      <div className="filter-section" aria-label="Graph filters">
+        <span className="control-label">Filters</span>
+        <div className="toggle-grid">
+          <button
+            type="button"
+            aria-pressed={showPrimitives}
+            onClick={() => setShowPrimitives(!showPrimitives)}
+          >
+            primitives
+          </button>
+          <button
+            type="button"
+            aria-pressed={showExternal}
+            onClick={() => setShowExternal(!showExternal)}
+          >
+            external
+          </button>
+          <button
+            type="button"
+            aria-pressed={exportedOnly}
+            onClick={() => setExportedOnly(!exportedOnly)}
+          >
+            exported
+          </button>
+          <button
+            type="button"
+            aria-pressed={excludeTests}
+            onClick={() => setExcludeTests(!excludeTests)}
+          >
+            exclude test
+          </button>
+          <button
+            type="button"
+            aria-pressed={excludeOrphans}
+            onClick={() => setExcludeOrphans(!excludeOrphans)}
+          >
+            exclude orphans
+          </button>
+        </div>
       </div>
 
-      <div className="kind-row" aria-label="Kind filters">
-        {Object.keys(kindFilters).map((kind) => (
-          <button
-            key={kind}
-            className={kindFilters[kind as keyof KindFilters] ? "active" : ""}
-            type="button"
-            onClick={() => toggleKind(kind as keyof KindFilters)}
-          >
-            {kind === "typeAlias" ? "type" : kind}
-          </button>
-        ))}
+      <div className="filter-section" aria-label="Kind filters">
+        <span className="control-label">Kinds</span>
+        <div className="toggle-grid kind-toggle-grid">
+          {Object.keys(kindFilters).map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              aria-pressed={kindFilters[kind as keyof KindFilters]}
+              onClick={() => toggleKind(kind as keyof KindFilters)}
+            >
+              {kind === "typeAlias" ? "type" : kind}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="result-list">
@@ -173,9 +150,19 @@ export function SearchPanel() {
             onClick={() => selectNode(node.id)}
           >
             <strong>{node.name}</strong>
-            <span>{nodeSubtitle(node)}</span>
+            <span>
+              <b>{kindLabel(node.kind)}</b>
+              {nodeSubtitle(node).slice(kindLabel(node.kind).length)}
+            </span>
             <small>
-              depends on {node.dependsOn.length} · used by {node.dependedOnBy.length}
+              depends on <b>{node.dependsOn.length}</b> ·{" "}
+              {node.dependedOnBy.length === 0 ? (
+                usageLabel(node)
+              ) : (
+                <>
+                  used by <b>{node.dependedOnBy.length}</b>
+                </>
+              )}
             </small>
           </button>
         ))}

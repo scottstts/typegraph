@@ -1,8 +1,9 @@
 import { useMemo } from "react";
+import type { ReactNode } from "react";
 import type { TypeGraphNode, TypeGraphPayload } from "../../shared/graphTypes.js";
+import { kindLabel, usageLabel } from "../graphUi.js";
 import { useGraphStore } from "../state/graphStore.js";
 import { DependedOnByList, DependsOnList } from "./DependsOnList.js";
-import { SourcePreview } from "./SourcePreview.js";
 
 type Token =
   | {
@@ -10,10 +11,42 @@ type Token =
       value: string;
     }
   | {
+      kind: "syntax";
+      value: string;
+      syntaxKind: "keyword" | "string" | "number" | "comment" | "punctuation";
+    }
+  | {
       kind: "reference";
       value: string;
       nodeId: string;
     };
+
+const syntaxKeywords = new Set([
+  "abstract",
+  "as",
+  "class",
+  "const",
+  "declare",
+  "enum",
+  "export",
+  "extends",
+  "false",
+  "from",
+  "implements",
+  "import",
+  "interface",
+  "keyof",
+  "namespace",
+  "new",
+  "null",
+  "readonly",
+  "true",
+  "type",
+  "undefined"
+]);
+
+const syntaxPattern =
+  /(\/\/[^\n]*|\/\*[\s\S]*?\*\/|`(?:\\[\s\S]|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b[A-Za-z_$][\w$]*\b|\b\d+(?:\.\d+)?\b|[{}()[\]<>=:;|&?,.])/g;
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -33,9 +66,56 @@ function buildReferenceMap(graph: TypeGraphPayload, node: TypeGraphNode): Map<st
   return references;
 }
 
+function syntaxKind(value: string): Extract<Token, { kind: "syntax" }>["syntaxKind"] {
+  if (value.startsWith("//") || value.startsWith("/*")) {
+    return "comment";
+  }
+
+  if (value.startsWith("'") || value.startsWith('"') || value.startsWith("`")) {
+    return "string";
+  }
+
+  if (/^\d/.test(value)) {
+    return "number";
+  }
+
+  if (syntaxKeywords.has(value)) {
+    return "keyword";
+  }
+
+  return "punctuation";
+}
+
+function tokenizeSyntaxText(text: string): Token[] {
+  const tokens: Token[] = [];
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(syntaxPattern)) {
+    const value = match[0];
+    const index = match.index;
+    if (index > lastIndex) {
+      tokens.push({ kind: "text", value: text.slice(lastIndex, index) });
+    }
+
+    if (syntaxKeywords.has(value) || !/^[A-Za-z_$][\w$]*$/.test(value)) {
+      tokens.push({ kind: "syntax", value, syntaxKind: syntaxKind(value) });
+    } else {
+      tokens.push({ kind: "text", value });
+    }
+
+    lastIndex = index + value.length;
+  }
+
+  if (lastIndex < text.length) {
+    tokens.push({ kind: "text", value: text.slice(lastIndex) });
+  }
+
+  return tokens;
+}
+
 function tokenizeDisplayText(text: string, references: Map<string, string>): Token[] {
   if (references.size === 0) {
-    return [{ kind: "text", value: text }];
+    return tokenizeSyntaxText(text);
   }
 
   const names = [...references.keys()].sort((a, b) => b.length - a.length);
@@ -47,7 +127,7 @@ function tokenizeDisplayText(text: string, references: Map<string, string>): Tok
     const value = match[0];
     const index = match.index;
     if (index > lastIndex) {
-      tokens.push({ kind: "text", value: text.slice(lastIndex, index) });
+      tokens.push(...tokenizeSyntaxText(text.slice(lastIndex, index)));
     }
     tokens.push({
       kind: "reference",
@@ -58,7 +138,7 @@ function tokenizeDisplayText(text: string, references: Map<string, string>): Tok
   }
 
   if (lastIndex < text.length) {
-    tokens.push({ kind: "text", value: text.slice(lastIndex) });
+    tokens.push(...tokenizeSyntaxText(text.slice(lastIndex)));
   }
 
   return tokens;
@@ -82,6 +162,13 @@ function ClickableDisplayText({
       {tokens.map((token, index) =>
         token.kind === "text" ? (
           <span key={`${token.value}-${index}`}>{token.value}</span>
+        ) : token.kind === "syntax" ? (
+          <span
+            key={`${token.value}-${index}`}
+            className={`syntax-token ${token.syntaxKind}`}
+          >
+            {token.value}
+          </span>
         ) : (
           <button
             key={`${token.value}-${index}`}
@@ -96,6 +183,28 @@ function ClickableDisplayText({
   );
 }
 
+function RelationshipSection({
+  title,
+  count,
+  children
+}: {
+  title: string;
+  count?: number | undefined;
+  children: ReactNode;
+}) {
+  return (
+    <details className="inspector-section" open>
+      <summary>
+        <span>
+          {title}
+          {count !== undefined && <> <b>{count}</b></>}
+        </span>
+      </summary>
+      <div className="inspector-section-body">{children}</div>
+    </details>
+  );
+}
+
 export function Inspector() {
   const graph = useGraphStore((state) => state.graph);
   const selectedNodeId = useGraphStore((state) => state.selectedNodeId);
@@ -105,7 +214,7 @@ export function Inspector() {
   if (graph === undefined || node === undefined) {
     return (
       <aside className="panel inspector">
-        <p className="empty">No node selected</p>
+        <p className="empty inspector-empty">Select a node to inspect details.</p>
       </aside>
     );
   }
@@ -113,11 +222,13 @@ export function Inspector() {
   return (
     <aside className="panel inspector">
       <header className="inspector-header">
-        <div>
-          <span>{node.kind === "typeAlias" ? "type alias" : node.kind}</span>
+        <div className="inspector-title">
+          <div className="inspector-badges">
+            <span>{kindLabel(node.kind)}</span>
+            {node.exported && <span>exported</span>}
+          </div>
           <h2>{node.name}</h2>
         </div>
-        <small>{node.exported ? "exported" : "local"}</small>
       </header>
 
       {node.relativeFilePath !== undefined && (
@@ -132,41 +243,20 @@ export function Inspector() {
         <ClickableDisplayText graph={graph} node={node} />
       </section>
 
-      <section>
-        <h3>Members</h3>
-        {node.members.length === 0 ? (
-          <p className="empty">None</p>
-        ) : (
-          <div className="member-list">
-            {node.members.map((member, index) => (
-              <div key={`${member.kind}-${member.name}-${index}`} className="member">
-                <strong>
-                  {member.name}
-                  {member.optional ? "?" : ""}
-                </strong>
-                <span>{member.displayType}</span>
-                <small>{member.kind}</small>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section>
-        <h3>Depends On</h3>
+      <RelationshipSection title="Depends On" count={node.dependsOn.length}>
         <DependsOnList graph={graph} node={node} />
-      </section>
+      </RelationshipSection>
 
-      <section>
-        <h3>Used By</h3>
-        <DependedOnByList graph={graph} node={node} />
-      </section>
-
-      <section>
-        <h3>Source</h3>
-        <SourcePreview nodeId={node.id} fallback={node.sourceText ?? node.displayText} />
-      </section>
+      <RelationshipSection
+        title={node.dependedOnBy.length === 0 ? usageLabel(node) : "Used By"}
+        count={node.dependedOnBy.length === 0 ? undefined : node.dependedOnBy.length}
+      >
+        {node.dependedOnBy.length === 0 ? (
+          <p className="empty">No incoming type references.</p>
+        ) : (
+          <DependedOnByList graph={graph} node={node} />
+        )}
+      </RelationshipSection>
     </aside>
   );
 }
-

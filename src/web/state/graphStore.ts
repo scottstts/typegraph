@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import type {
-  TypeGraphNode,
   TypeGraphNodeKind,
   TypeGraphPayload
 } from "../../shared/graphTypes.js";
@@ -15,7 +14,8 @@ export type GraphStore = {
   showPrimitives: boolean;
   showExternal: boolean;
   exportedOnly: boolean;
-  currentDirectoryOnly: boolean;
+  excludeTests: boolean;
+  excludeOrphans: boolean;
   kindFilters: KindFilters;
   dependencyDepth: number;
   dependentDepth: number;
@@ -26,11 +26,13 @@ export type GraphStore = {
   loadGraph: () => Promise<void>;
   applyScope: (scopePath: string | undefined) => Promise<void>;
   selectNode: (nodeId: string) => void;
+  clearSelection: () => void;
   setSearchQuery: (query: string) => void;
   setShowPrimitives: (value: boolean) => void;
   setShowExternal: (value: boolean) => void;
   setExportedOnly: (value: boolean) => void;
-  setCurrentDirectoryOnly: (value: boolean) => void;
+  setExcludeTests: (value: boolean) => void;
+  setExcludeOrphans: (value: boolean) => void;
   toggleKind: (kind: keyof KindFilters) => void;
   setDependencyDepth: (depth: number) => void;
   setDependentDepth: (depth: number) => void;
@@ -43,11 +45,7 @@ const defaultKindFilters: KindFilters = {
   enum: true
 };
 
-function firstProjectNode(graph: TypeGraphPayload): TypeGraphNode | undefined {
-  return graph.nodes.find((node) => node.isProjectLocal);
-}
-
-function selectedOrFirst(
+function selectedIfPresent(
   graph: TypeGraphPayload,
   selectedNodeId: string | undefined
 ): string | undefined {
@@ -58,7 +56,7 @@ function selectedOrFirst(
     return selectedNodeId;
   }
 
-  return firstProjectNode(graph)?.id;
+  return undefined;
 }
 
 export const useGraphStore = create<GraphStore>((set, get) => ({
@@ -66,7 +64,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   showPrimitives: false,
   showExternal: false,
   exportedOnly: false,
-  currentDirectoryOnly: false,
+  excludeTests: true,
+  excludeOrphans: true,
   kindFilters: defaultKindFilters,
   dependencyDepth: 1,
   dependentDepth: 1,
@@ -82,7 +81,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       const graph = await fetchGraph();
       set({
         graph,
-        selectedNodeId: selectedOrFirst(graph, get().selectedNodeId),
+        selectedNodeId: selectedIfPresent(graph, get().selectedNodeId),
         loading: false,
         updatedAt: graph.indexedAt
       });
@@ -100,7 +99,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       const response = await updateScope(scopePath);
       set({
         graph: response.graph,
-        selectedNodeId: selectedOrFirst(response.graph, get().selectedNodeId),
+        selectedNodeId: selectedIfPresent(response.graph, get().selectedNodeId),
         loading: false,
         updatedAt: response.graph.indexedAt
       });
@@ -113,11 +112,13 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
 
   selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
+  clearSelection: () => set({ selectedNodeId: undefined }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setShowPrimitives: (showPrimitives) => set({ showPrimitives }),
   setShowExternal: (showExternal) => set({ showExternal }),
   setExportedOnly: (exportedOnly) => set({ exportedOnly }),
-  setCurrentDirectoryOnly: (currentDirectoryOnly) => set({ currentDirectoryOnly }),
+  setExcludeTests: (excludeTests) => set({ excludeTests }),
+  setExcludeOrphans: (excludeOrphans) => set({ excludeOrphans }),
   toggleKind: (kind) =>
     set((state) => ({
       kindFilters: {
