@@ -395,8 +395,10 @@ button {
   border-top: 1px solid color-mix(in srgb, var(--lane-color) 48%, transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--lane-color) 44%, transparent);
   background: var(--lane-fill);
-  padding: 14px 22px 0 calc(20px + var(--lane-indent));
+  justify-items: start;
+  padding: 12px 8px 0;
   color: var(--muted);
+  text-align: left;
 }
 
 .source-rail-entry span,
@@ -404,6 +406,7 @@ button {
   overflow: visible;
   white-space: nowrap;
   font-size: 11px;
+  font-weight: 560;
   line-height: 1.15;
 }
 
@@ -589,7 +592,7 @@ button {
 }
 
 .canvas-panel-toggle.left {
-  left: 12px;
+  left: calc(var(--source-rail-width, 80px) + 12px);
 }
 
 .canvas-panel-toggle.right {
@@ -603,7 +606,7 @@ button {
 }
 
 .react-flow__controls {
-  left: 374px !important;
+  left: calc(var(--source-rail-width, 80px) + 14px) !important;
   z-index: 13;
   overflow: hidden;
   border: 1px solid var(--border);

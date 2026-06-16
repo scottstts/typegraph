@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import type { CSSProperties } from "react";
 import {
   Controls,
@@ -12,7 +19,6 @@ import {
 } from "@xyflow/react";
 import { nodeMatchesFilters } from "../graphUi.js";
 import {
-  SOURCE_RAIL_WIDTH,
   buildCanvasLayout,
   decorateCanvasLayout,
   emptyCanvasLayout,
@@ -24,8 +30,12 @@ import { CanvasEdge, type TypeGraphFlowEdge } from "./CanvasEdge.js";
 import { NodeCard, type TypeGraphFlowNode } from "./NodeCard.js";
 
 const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 0.72 };
+const ABSOLUTE_MIN_ZOOM = 0.035;
+const MAX_ZOOM = 1.65;
 const SELECTED_NODE_ZOOM = 1;
 const HOVER_CARD_SCREEN_GAP = 14;
+const VIEWPORT_POSITION_EPSILON = 0.5;
+const VIEWPORT_ZOOM_EPSILON = 0.0001;
 
 const nodeTypes: NodeTypes = {
   typeGraphNode: NodeCard
@@ -77,9 +87,11 @@ function SourceLaneLayer({
 
 function FixedSourceRail({
   lanes,
+  width,
   viewport
 }: {
   lanes: SourceLane[];
+  width: number;
   viewport: Viewport;
 }) {
   return (
@@ -87,7 +99,7 @@ function FixedSourceRail({
       className="source-rail-overlay"
       style={
         {
-          "--source-rail-width": `${SOURCE_RAIL_WIDTH}px`
+          "--source-rail-width": `${width}px`
         } as CSSProperties
       }
     >
@@ -100,8 +112,7 @@ function FixedSourceRail({
               "--lane-screen-y": `${viewport.y + lane.y * viewport.zoom}px`,
               "--lane-screen-height": `${lane.height * viewport.zoom}px`,
               "--lane-color": lane.color,
-              "--lane-fill": lane.fill,
-              "--lane-indent": `${Math.min(lane.depth, 7) * 13}px`
+              "--lane-fill": lane.fill
             } as CSSProperties
           }
         >
@@ -164,6 +175,43 @@ type GraphCanvasProps = {
 
 type FlowInstance = ReactFlowInstance<TypeGraphFlowNode, TypeGraphFlowEdge>;
 
+type CanvasSize = {
+  width: number;
+  height: number;
+};
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function clampViewportToLaneSurface(
+  viewport: Viewport,
+  canvasSize: CanvasSize,
+  layout: CanvasLayout,
+  minZoom: number
+): Viewport {
+  const zoom = Math.min(MAX_ZOOM, Math.max(viewport.zoom, minZoom));
+  const scaledWidth = layout.width * zoom;
+  const scaledHeight = layout.height * zoom;
+  const minX = Math.min(layout.sourceRailWidth, canvasSize.width - scaledWidth);
+  const maxX = layout.sourceRailWidth;
+  const minY = Math.min(0, canvasSize.height - scaledHeight);
+
+  return {
+    x: clamp(viewport.x, minX, maxX),
+    y: clamp(viewport.y, minY, 0),
+    zoom
+  };
+}
+
+function viewportNeedsUpdate(current: Viewport, next: Viewport): boolean {
+  return (
+    Math.abs(current.x - next.x) > VIEWPORT_POSITION_EPSILON ||
+    Math.abs(current.y - next.y) > VIEWPORT_POSITION_EPSILON ||
+    Math.abs(current.zoom - next.zoom) > VIEWPORT_ZOOM_EPSILON
+  );
+}
+
 export function GraphCanvas({
   leftPanelCollapsed,
   rightPanelCollapsed,
@@ -188,7 +236,43 @@ export function GraphCanvas({
   const [baseLayout, setBaseLayout] = useState<CanvasLayout>(emptyCanvasLayout);
   const [viewport, setViewport] = useState<Viewport>(DEFAULT_VIEWPORT);
   const [flowInstance, setFlowInstance] = useState<FlowInstance | undefined>();
+  const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width: 0, height: 0 });
+  const flowWrapRef = useRef<HTMLDivElement | null>(null);
   const hoverClearTimeout = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    const element = flowWrapRef.current;
+    if (element === null) {
+      return undefined;
+    }
+
+    const observedElement = element;
+
+    function updateCanvasSize(): void {
+      setCanvasSize((currentSize) => {
+        const nextSize = {
+          width: observedElement.clientWidth,
+          height: observedElement.clientHeight
+        };
+
+        return currentSize.width === nextSize.width &&
+          currentSize.height === nextSize.height
+          ? currentSize
+          : nextSize;
+      });
+    }
+
+    updateCanvasSize();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateCanvasSize);
+      return () => window.removeEventListener("resize", updateCanvasSize);
+    }
+
+    const observer = new ResizeObserver(updateCanvasSize);
+    observer.observe(observedElement);
+    return () => observer.disconnect();
+  }, []);
 
   const cancelHoverClear = useCallback(() => {
     if (hoverClearTimeout.current !== undefined) {
@@ -320,13 +404,62 @@ export function GraphCanvas({
     [decoratedLayout.nodes, handleNodeHoverEnd, handleNodeHoverStart]
   );
   const { edges } = decoratedLayout;
-  const canvasExtent = useMemo<CoordinateExtent>(
+  const minZoom = useMemo(() => {
+    if (
+      canvasSize.width <= 0 ||
+      canvasSize.height <= 0 ||
+      baseLayout.width <= 0 ||
+      baseLayout.height <= 0
+    ) {
+      return ABSOLUTE_MIN_ZOOM;
+    }
+
+    return Math.min(
+      MAX_ZOOM,
+      Math.max(
+        ABSOLUTE_MIN_ZOOM,
+        canvasSize.width / baseLayout.width,
+        canvasSize.height / baseLayout.height
+      )
+    );
+  }, [baseLayout.height, baseLayout.width, canvasSize.height, canvasSize.width]);
+  const nodeExtent = useMemo<CoordinateExtent>(
     () => [
       [0, 0],
       [Math.max(baseLayout.width, 1), Math.max(baseLayout.height, 1)]
     ],
     [baseLayout.height, baseLayout.width]
   );
+  const translateExtent = useMemo<CoordinateExtent>(() => {
+    const safeZoom = Math.max(viewport.zoom, minZoom);
+    return [
+      [-baseLayout.sourceRailWidth / safeZoom, 0],
+      [Math.max(baseLayout.width, 1), Math.max(baseLayout.height, 1)]
+    ];
+  }, [baseLayout.height, baseLayout.sourceRailWidth, baseLayout.width, minZoom, viewport.zoom]);
+
+  useLayoutEffect(() => {
+    if (
+      flowInstance === undefined ||
+      canvasSize.width <= 0 ||
+      canvasSize.height <= 0
+    ) {
+      return;
+    }
+
+    const currentViewport = flowInstance.getViewport();
+    const nextViewport = clampViewportToLaneSurface(
+      currentViewport,
+      canvasSize,
+      baseLayout,
+      minZoom
+    );
+    if (!viewportNeedsUpdate(currentViewport, nextViewport)) {
+      return;
+    }
+
+    void flowInstance.setViewport(nextViewport, { duration: 0 });
+  }, [baseLayout, canvasSize, flowInstance, minZoom, viewport]);
 
   useEffect(() => {
     if (flowInstance === undefined || selectedNodeId === undefined) {
@@ -351,7 +484,15 @@ export function GraphCanvas({
 
   return (
     <main className="graph-shell">
-      <div className="flow-wrap">
+      <div
+        ref={flowWrapRef}
+        className="flow-wrap"
+        style={
+          {
+            "--source-rail-width": `${baseLayout.sourceRailWidth}px`
+          } as CSSProperties
+        }
+      >
         <button
           type="button"
           className="canvas-panel-toggle left"
@@ -374,10 +515,10 @@ export function GraphCanvas({
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           defaultViewport={DEFAULT_VIEWPORT}
-          translateExtent={canvasExtent}
-          nodeExtent={canvasExtent}
-          minZoom={0.035}
-          maxZoom={1.65}
+          translateExtent={translateExtent}
+          nodeExtent={nodeExtent}
+          minZoom={minZoom}
+          maxZoom={MAX_ZOOM}
           nodesDraggable={false}
           nodesConnectable={false}
           selectionOnDrag={false}
@@ -401,7 +542,11 @@ export function GraphCanvas({
           />
           <Controls position="bottom-left" showInteractive={false} />
         </ReactFlow>
-        <FixedSourceRail lanes={baseLayout.lanes} viewport={viewport} />
+        <FixedSourceRail
+          lanes={baseLayout.lanes}
+          width={baseLayout.sourceRailWidth}
+          viewport={viewport}
+        />
         {hoveredNode !== undefined && (
           <NodeHoverCardOverlay node={hoveredNode} viewport={viewport} />
         )}

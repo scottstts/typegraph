@@ -7,19 +7,30 @@ import type { TypeGraphFlowNode } from "./components/NodeCard.js";
 
 const elk = new ELK();
 
-export const SOURCE_RAIL_WIDTH = 360;
+export const SOURCE_RAIL_FALLBACK_WIDTH = 80;
 export const NODE_HEIGHT = 42;
 
 const LANE_LEFT_PADDING = 120;
 const LANE_RIGHT_PADDING = 360;
 const LANE_TOP_PADDING = 58;
 const LANE_BOTTOM_PADDING = 58;
-const LANE_GAP = 18;
 const NODE_ROW_GAP = 84;
 const X_SCALE = 1.42;
-const MIN_NODE_WIDTH = 174;
-const NODE_LABEL_CHARACTER_WIDTH = 8.4;
-const NODE_HORIZONTAL_PADDING = 58;
+const MIN_NODE_WIDTH = 58;
+const NODE_DOT_LABEL_GAP = 8;
+const NODE_LABEL_RIGHT_PADDING = 4;
+const NODE_LABEL_FONT =
+  '690 12px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+const SOURCE_RAIL_LEFT_PADDING = 8;
+const SOURCE_RAIL_RIGHT_PADDING = 8;
+const SOURCE_RAIL_DIRECTORY_FONT =
+  '560 11px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+const SOURCE_RAIL_FILE_FONT =
+  '760 13px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+const SOURCE_RAIL_META_FONT =
+  '560 11px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+let textMeasureContext: CanvasRenderingContext2D | null | undefined;
 
 const lanePalette = [
   { line: "hsl(166 55% 36%)", fill: "hsl(166 52% 94%)" },
@@ -54,11 +65,15 @@ export type CanvasLayout = {
   nodes: TypeGraphFlowNode[];
   edges: TypeGraphFlowEdge[];
   lanes: SourceLane[];
+  sourceRailWidth: number;
   width: number;
   height: number;
 };
 
-type LaneDraft = Omit<SourceLane, "color" | "fill" | "height" | "width" | "y" | "nodeCount"> & {
+type LaneDraft = Omit<
+  SourceLane,
+  "color" | "fill" | "height" | "width" | "y" | "nodeCount"
+> & {
   nodeIds: string[];
 };
 
@@ -71,6 +86,7 @@ export const emptyCanvasLayout: CanvasLayout = {
   nodes: [],
   edges: [],
   lanes: [],
+  sourceRailWidth: SOURCE_RAIL_FALLBACK_WIDTH,
   width: 1200,
   height: 800
 };
@@ -79,9 +95,60 @@ function nodeSort(a: TypeGraphNode, b: TypeGraphNode): number {
   return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
 }
 
+function estimatedTextWidth(text: string): number {
+  let width = 0;
+
+  for (const character of text) {
+    if (/[ilI1.:,;|'`!]/.test(character)) {
+      width += 3.8;
+      continue;
+    }
+
+    if (/[mwMW@#%&]/.test(character)) {
+      width += 9.2;
+      continue;
+    }
+
+    if (/[A-Z]/.test(character)) {
+      width += 7.4;
+      continue;
+    }
+
+    width += 6.6;
+  }
+
+  return width;
+}
+
+function measuredTextWidth(text: string, font: string): number {
+  if (textMeasureContext === undefined) {
+    const canvas =
+      typeof document === "undefined" ? undefined : document.createElement("canvas");
+    textMeasureContext = canvas?.getContext("2d") ?? null;
+  }
+
+  if (textMeasureContext === null) {
+    return estimatedTextWidth(text);
+  }
+
+  textMeasureContext.font = font;
+  return textMeasureContext.measureText(text).width;
+}
+
+function nodeDotSize(node: TypeGraphNode): number {
+  const connectionCount = node.dependsOn.length + node.dependedOnBy.length;
+  return Math.min(18, 10 + Math.sqrt(connectionCount) * 1.8);
+}
+
 function nodeWidth(node: TypeGraphNode): number {
   return Math.ceil(
-    Math.max(MIN_NODE_WIDTH, node.name.length * NODE_LABEL_CHARACTER_WIDTH + NODE_HORIZONTAL_PADDING)
+    Math.max(
+      MIN_NODE_WIDTH,
+      nodeDotSize(node) +
+        NODE_DOT_LABEL_GAP +
+        measuredTextWidth(node.name, NODE_LABEL_FONT) +
+        NODE_LABEL_RIGHT_PADDING
+    )
   );
 }
 
@@ -113,6 +180,29 @@ function lanePath(node: TypeGraphNode): string {
 
 function laneDepth(path: string): number {
   return path.split("/").filter(Boolean).length - 1;
+}
+
+function sourceRailWidth(drafts: LaneDraft[]): number {
+  const widestLabel = Math.max(
+    0,
+    ...drafts.map((draft) => {
+      const nodeCountText = `${draft.nodeIds.length} nodes`;
+      const labelWidth = Math.max(
+        measuredTextWidth(draft.directory, SOURCE_RAIL_DIRECTORY_FONT),
+        measuredTextWidth(draft.fileName, SOURCE_RAIL_FILE_FONT),
+        measuredTextWidth(nodeCountText, SOURCE_RAIL_META_FONT)
+      );
+
+      return labelWidth;
+    })
+  );
+
+  return Math.ceil(
+    Math.max(
+      SOURCE_RAIL_FALLBACK_WIDTH,
+      SOURCE_RAIL_LEFT_PADDING + widestLabel + SOURCE_RAIL_RIGHT_PADDING
+    )
+  );
 }
 
 function buildLaneDrafts(nodes: TypeGraphNode[]): LaneDraft[] {
@@ -162,7 +252,7 @@ function buildLanes(drafts: LaneDraft[], width: number): SourceLane[] {
       depth: draft.depth,
       nodeCount: draft.nodeIds.length
     };
-    y += height + LANE_GAP;
+    y += height;
     return lane;
   });
 }
@@ -267,6 +357,7 @@ export async function buildCanvasLayout(
 
   const nodesById = new Map(visibleNodes.map((node) => [node.id, node]));
   const laneDrafts = buildLaneDrafts(visibleNodes);
+  const sourceRailWidthValue = sourceRailWidth(laneDrafts);
   const layout = await elk.layout(buildElkGraph(visibleNodes, visibleEdges));
   const positions = elkPositions(layout);
   const minX = Math.min(...visibleNodes.map((node) => positions.get(node.id)?.x ?? 0));
@@ -278,7 +369,7 @@ export async function buildCanvasLayout(
   );
   const width = Math.max(
     1600,
-    SOURCE_RAIL_WIDTH + LANE_LEFT_PADDING + (maxRight - minX) * X_SCALE + LANE_RIGHT_PADDING
+    sourceRailWidthValue + LANE_LEFT_PADDING + (maxRight - minX) * X_SCALE + LANE_RIGHT_PADDING
   );
   const lanes = buildLanes(laneDrafts, width);
   const lanesByPath = new Map(lanes.map((lane) => [lane.path, lane]));
@@ -303,7 +394,7 @@ export async function buildCanvasLayout(
         id,
         type: "typeGraphNode",
         position: {
-          x: SOURCE_RAIL_WIDTH + LANE_LEFT_PADDING + (position.x - minX) * X_SCALE,
+          x: sourceRailWidthValue + LANE_LEFT_PADDING + (position.x - minX) * X_SCALE,
           y: lane.y + LANE_TOP_PADDING + index * NODE_ROW_GAP
         },
         style: {
@@ -353,6 +444,7 @@ export async function buildCanvasLayout(
     nodes: flowNodes,
     edges: flowEdges,
     lanes,
+    sourceRailWidth: sourceRailWidthValue,
     width,
     height
   };
