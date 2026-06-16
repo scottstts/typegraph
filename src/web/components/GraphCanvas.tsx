@@ -1,309 +1,133 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import {
-  Background,
   Controls,
   ReactFlow,
-  type Edge,
-  type NodeTypes
+  ViewportPortal,
+  type CoordinateExtent,
+  type EdgeTypes,
+  type NodeTypes,
+  type ReactFlowInstance,
+  type Viewport
 } from "@xyflow/react";
-import type {
-  TypeGraphEdge,
-  TypeGraphNode
-} from "../../shared/graphTypes.js";
 import { nodeMatchesFilters } from "../graphUi.js";
+import {
+  SOURCE_RAIL_WIDTH,
+  buildCanvasLayout,
+  decorateCanvasLayout,
+  emptyCanvasLayout,
+  type CanvasLayout,
+  type SourceLane
+} from "../graphLayout.js";
 import { useGraphStore } from "../state/graphStore.js";
+import { CanvasEdge, type TypeGraphFlowEdge } from "./CanvasEdge.js";
 import { NodeCard, type TypeGraphFlowNode } from "./NodeCard.js";
+
+const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 0.72 };
+const SELECTED_NODE_ZOOM = 1;
 
 const nodeTypes: NodeTypes = {
   typeGraphNode: NodeCard
 };
 
-const COMPONENT_ROW_WIDTH = 2300;
-const COMPONENT_GAP_X = 180;
-const COMPONENT_GAP_Y = 130;
-const LEVEL_GAP_X = 132;
-const NODE_GAP_Y = 52;
-
-type LaidOutGraph = {
-  nodes: TypeGraphFlowNode[];
-  edges: Edge[];
+const edgeTypes: EdgeTypes = {
+  canvasEdge: CanvasEdge
 };
 
-type ComponentLayout = {
-  ids: string[];
-  positions: Map<string, { x: number; y: number }>;
+function SourceLaneLayer({
+  lanes,
+  width,
+  height
+}: {
+  lanes: SourceLane[];
   width: number;
   height: number;
-  name: string;
+}) {
+  return (
+    <ViewportPortal>
+      <div
+        className="source-lane-layer"
+        style={
+          {
+            "--lane-layer-width": `${width}px`,
+            "--lane-layer-height": `${height}px`
+          } as CSSProperties
+        }
+      >
+        {lanes.map((lane) => (
+          <div
+            key={lane.id}
+            className="source-lane"
+            style={
+              {
+                "--lane-y": `${lane.y}px`,
+                "--lane-height": `${lane.height}px`,
+                "--lane-width": `${lane.width}px`,
+                "--lane-color": lane.color,
+                "--lane-fill": lane.fill
+              } as CSSProperties
+            }
+          />
+        ))}
+      </div>
+    </ViewportPortal>
+  );
+}
+
+function FixedSourceRail({
+  lanes,
+  viewport
+}: {
+  lanes: SourceLane[];
+  viewport: Viewport;
+}) {
+  return (
+    <div
+      className="source-rail-overlay"
+      style={
+        {
+          "--source-rail-width": `${SOURCE_RAIL_WIDTH}px`
+        } as CSSProperties
+      }
+    >
+      {lanes.map((lane) => (
+        <div
+          key={lane.id}
+          className="source-rail-entry"
+          style={
+            {
+              "--lane-screen-y": `${viewport.y + lane.y * viewport.zoom}px`,
+              "--lane-screen-height": `${lane.height * viewport.zoom}px`,
+              "--lane-color": lane.color,
+              "--lane-fill": lane.fill,
+              "--lane-indent": `${Math.min(lane.depth, 7) * 13}px`
+            } as CSSProperties
+          }
+        >
+          <span>{lane.directory}</span>
+          <strong>{lane.fileName}</strong>
+          <small>{lane.nodeCount} nodes</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+type GraphCanvasProps = {
+  leftPanelCollapsed: boolean;
+  rightPanelCollapsed: boolean;
+  onToggleLeftPanel: () => void;
+  onToggleRightPanel: () => void;
 };
 
-function nodeSort(a: TypeGraphNode, b: TypeGraphNode): number {
-  return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
-}
+type FlowInstance = ReactFlowInstance<TypeGraphFlowNode, TypeGraphFlowEdge>;
 
-function nodeDegree(node: TypeGraphNode): number {
-  return node.dependsOn.length + node.dependedOnBy.length;
-}
-
-function deterministicJitter(id: string, amplitude: number): number {
-  let hash = 0;
-  for (const character of id) {
-    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  }
-  return ((hash % 1000) / 1000 - 0.5) * amplitude;
-}
-
-function buildComponents(nodes: TypeGraphNode[], edges: TypeGraphEdge[]): string[][] {
-  const nodesById = new Map(nodes.map((node) => [node.id, node]));
-  const adjacency = new Map(nodes.map((node) => [node.id, new Set<string>()]));
-
-  for (const edge of edges) {
-    adjacency.get(edge.from)?.add(edge.to);
-    adjacency.get(edge.to)?.add(edge.from);
-  }
-
-  const components: string[][] = [];
-  const seen = new Set<string>();
-
-  for (const node of [...nodes].sort(nodeSort)) {
-    if (seen.has(node.id)) {
-      continue;
-    }
-
-    const component: string[] = [];
-    const queue = [node.id];
-    seen.add(node.id);
-
-    let queueIndex = 0;
-    while (queueIndex < queue.length) {
-      const id = queue[queueIndex];
-      queueIndex += 1;
-      if (id === undefined) {
-        continue;
-      }
-      component.push(id);
-      const neighbors = [...(adjacency.get(id) ?? [])].sort((left, right) => {
-        const leftNode = nodesById.get(left);
-        const rightNode = nodesById.get(right);
-        if (leftNode === undefined || rightNode === undefined) {
-          return left.localeCompare(right);
-        }
-        return nodeSort(leftNode, rightNode);
-      });
-
-      for (const nextId of neighbors) {
-        if (!seen.has(nextId)) {
-          seen.add(nextId);
-          queue.push(nextId);
-        }
-      }
-    }
-
-    components.push(component);
-  }
-
-  return components.sort((left, right) => {
-    if (right.length !== left.length) {
-      return right.length - left.length;
-    }
-    const leftFirstId = left[0] ?? "";
-    const rightFirstId = right[0] ?? "";
-    const leftName = nodesById.get(leftFirstId)?.name ?? leftFirstId;
-    const rightName = nodesById.get(rightFirstId)?.name ?? rightFirstId;
-    return leftName.localeCompare(rightName);
-  });
-}
-
-function assignLevels(
-  componentIds: string[],
-  edges: TypeGraphEdge[],
-  nodesById: Map<string, TypeGraphNode>
-): Map<string, number> {
-  const componentIdSet = new Set(componentIds);
-  const outgoing = new Map(componentIds.map((id) => [id, [] as string[]]));
-  const incomingCount = new Map(componentIds.map((id) => [id, 0]));
-
-  for (const edge of edges) {
-    if (!componentIdSet.has(edge.from) || !componentIdSet.has(edge.to)) {
-      continue;
-    }
-
-    outgoing.get(edge.from)?.push(edge.to);
-    incomingCount.set(edge.to, (incomingCount.get(edge.to) ?? 0) + 1);
-  }
-
-  for (const targets of outgoing.values()) {
-    targets.sort((left, right) => {
-      const leftNode = nodesById.get(left);
-      const rightNode = nodesById.get(right);
-      if (leftNode === undefined || rightNode === undefined) {
-        return left.localeCompare(right);
-      }
-      return nodeSort(leftNode, rightNode);
-    });
-  }
-
-  const sortedIds = [...componentIds].sort((left, right) => {
-    const leftNode = nodesById.get(left);
-    const rightNode = nodesById.get(right);
-    if (leftNode === undefined || rightNode === undefined) {
-      return left.localeCompare(right);
-    }
-    return nodeDegree(rightNode) - nodeDegree(leftNode) || nodeSort(leftNode, rightNode);
-  });
-
-  const roots = sortedIds.filter((id) => incomingCount.get(id) === 0);
-  const seedIds = roots.length > 0 ? roots : sortedIds.slice(0, 1);
-  const levels = new Map<string, number>();
-  const queue: string[] = [];
-
-  for (const id of seedIds) {
-    levels.set(id, 0);
-    queue.push(id);
-  }
-
-  let queueIndex = 0;
-  while (queueIndex < queue.length) {
-    const id = queue[queueIndex];
-    queueIndex += 1;
-    if (id === undefined) {
-      continue;
-    }
-    const level = levels.get(id) ?? 0;
-    for (const targetId of outgoing.get(id) ?? []) {
-      if (!levels.has(targetId)) {
-        levels.set(targetId, level + 1);
-        queue.push(targetId);
-      }
-    }
-  }
-
-  for (const id of sortedIds) {
-    if (!levels.has(id)) {
-      levels.set(id, 0);
-    }
-  }
-
-  return levels;
-}
-
-function layoutComponent(
-  ids: string[],
-  edges: TypeGraphEdge[],
-  nodesById: Map<string, TypeGraphNode>
-): ComponentLayout {
-  const levels = assignLevels(ids, edges, nodesById);
-  const byLevel = new Map<number, string[]>();
-
-  for (const id of ids) {
-    const level = levels.get(id) ?? 0;
-    const column = byLevel.get(level) ?? [];
-    column.push(id);
-    byLevel.set(level, column);
-  }
-
-  for (const column of byLevel.values()) {
-    column.sort((left, right) => {
-      const leftNode = nodesById.get(left);
-      const rightNode = nodesById.get(right);
-      if (leftNode === undefined || rightNode === undefined) {
-        return left.localeCompare(right);
-      }
-      return nodeDegree(rightNode) - nodeDegree(leftNode) || nodeSort(leftNode, rightNode);
-    });
-  }
-
-  const orderedLevels = [...byLevel.keys()].sort((a, b) => a - b);
-  const maxColumnSize = Math.max(...[...byLevel.values()].map((column) => column.length));
-  const width = Math.max(90, (orderedLevels.length - 1) * LEVEL_GAP_X + 90);
-  const height = Math.max(90, (maxColumnSize - 1) * NODE_GAP_Y + 90);
-  const positions = new Map<string, { x: number; y: number }>();
-
-  orderedLevels.forEach((level, levelIndex) => {
-    const column = byLevel.get(level) ?? [];
-    const columnHeight = (column.length - 1) * NODE_GAP_Y;
-    column.forEach((id, index) => {
-      positions.set(id, {
-        x: levelIndex * LEVEL_GAP_X + deterministicJitter(id, 12),
-        y: index * NODE_GAP_Y - columnHeight / 2 + deterministicJitter(id, 16)
-      });
-    });
-  });
-
-  const names = ids
-    .map((id) => nodesById.get(id)?.name ?? id)
-    .sort((left, right) => left.localeCompare(right));
-
-  return {
-    ids,
-    positions,
-    width,
-    height,
-    name: names[0] ?? ""
-  };
-}
-
-function layoutVisibleGraph(
-  visibleNodes: TypeGraphNode[],
-  visibleEdges: TypeGraphEdge[],
-  selectedNodeId: string | undefined
-): LaidOutGraph {
-  const nodesById = new Map(visibleNodes.map((node) => [node.id, node]));
-  const componentLayouts = buildComponents(visibleNodes, visibleEdges)
-    .map((componentIds) => layoutComponent(componentIds, visibleEdges, nodesById))
-    .sort((left, right) => right.ids.length - left.ids.length || left.name.localeCompare(right.name));
-
-  const positions = new Map<string, { x: number; y: number }>();
-  let cursorX = 0;
-  let cursorY = 0;
-  let rowHeight = 0;
-
-  for (const component of componentLayouts) {
-    if (cursorX > 0 && cursorX + component.width > COMPONENT_ROW_WIDTH) {
-      cursorX = 0;
-      cursorY += rowHeight + COMPONENT_GAP_Y;
-      rowHeight = 0;
-    }
-
-    for (const [id, position] of component.positions) {
-      positions.set(id, {
-        x: cursorX + position.x,
-        y: cursorY + component.height / 2 + position.y
-      });
-    }
-
-    cursorX += component.width + COMPONENT_GAP_X;
-    rowHeight = Math.max(rowHeight, component.height);
-  }
-
-  const nodes: TypeGraphFlowNode[] = visibleNodes.map((node) => ({
-    id: node.id,
-    type: "typeGraphNode",
-    position: positions.get(node.id) ?? { x: 0, y: 0 },
-    data: {
-      graphNode: node,
-      selected: node.id === selectedNodeId
-    }
-  }));
-
-  const edges: Edge[] = visibleEdges.map((edge) => ({
-    id: edge.id,
-    source: edge.from,
-    target: edge.to,
-    type: "smoothstep",
-    className:
-      edge.from === selectedNodeId || edge.to === selectedNodeId
-        ? `graph-edge edge-${edge.kind} selected`
-        : `graph-edge edge-${edge.kind}`
-  }));
-
-  return {
-    nodes,
-    edges
-  };
-}
-
-export function GraphCanvas() {
+export function GraphCanvas({
+  leftPanelCollapsed,
+  rightPanelCollapsed,
+  onToggleLeftPanel,
+  onToggleRightPanel
+}: GraphCanvasProps) {
   const graph = useGraphStore((state) => state.graph);
   const selectedNodeId = useGraphStore((state) => state.selectedNodeId);
   const searchQuery = useGraphStore((state) => state.searchQuery);
@@ -318,13 +142,48 @@ export function GraphCanvas() {
   const updatedAt = useGraphStore((state) => state.updatedAt);
   const selectNode = useGraphStore((state) => state.selectNode);
   const clearSelection = useGraphStore((state) => state.clearSelection);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | undefined>();
+  const [baseLayout, setBaseLayout] = useState<CanvasLayout>(emptyCanvasLayout);
+  const [viewport, setViewport] = useState<Viewport>(DEFAULT_VIEWPORT);
+  const [flowInstance, setFlowInstance] = useState<FlowInstance | undefined>();
+  const hoverClearTimeout = useRef<number | undefined>(undefined);
 
-  const { nodes, edges } = useMemo(() => {
+  const cancelHoverClear = useCallback(() => {
+    if (hoverClearTimeout.current !== undefined) {
+      window.clearTimeout(hoverClearTimeout.current);
+      hoverClearTimeout.current = undefined;
+    }
+  }, []);
+
+  const handleNodeHoverStart = useCallback(
+    (nodeId: string) => {
+      cancelHoverClear();
+      setHoveredNodeId(nodeId);
+    },
+    [cancelHoverClear]
+  );
+
+  const handleNodeHoverEnd = useCallback(
+    (nodeId: string) => {
+      cancelHoverClear();
+      hoverClearTimeout.current = window.setTimeout(() => {
+        setHoveredNodeId((currentNodeId) =>
+          currentNodeId === nodeId ? undefined : currentNodeId
+        );
+        hoverClearTimeout.current = undefined;
+      }, 90);
+    },
+    [cancelHoverClear]
+  );
+
+  useEffect(() => cancelHoverClear, [cancelHoverClear]);
+
+  const filteredGraph = useMemo(() => {
     if (graph === undefined) {
       return { nodes: [], edges: [] };
     }
 
-    const visibleNodes = graph.nodes
+    const nodes = graph.nodes
       .filter((node) =>
         nodeMatchesFilters(node, graph, {
           searchQuery,
@@ -336,13 +195,14 @@ export function GraphCanvas() {
           kindFilters
         })
       )
-      .sort(nodeSort);
-    const visibleIds = new Set(visibleNodes.map((node) => node.id));
-    const visibleEdges = graph.edges.filter(
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+
+    const visibleIds = new Set(nodes.map((node) => node.id));
+    const edges = graph.edges.filter(
       (edge) => visibleIds.has(edge.from) && visibleIds.has(edge.to)
     );
 
-    return layoutVisibleGraph(visibleNodes, visibleEdges, selectedNodeId);
+    return { nodes, edges };
   }, [
     excludeOrphans,
     excludeTests,
@@ -350,36 +210,159 @@ export function GraphCanvas() {
     graph,
     kindFilters,
     searchQuery,
-    selectedNodeId,
     showExternal,
     showPrimitives
   ]);
 
+  const visibleGraph = useMemo(() => {
+    if (
+      graph === undefined ||
+      selectedNodeId === undefined ||
+      filteredGraph.nodes.some((node) => node.id === selectedNodeId)
+    ) {
+      return filteredGraph;
+    }
+
+    const selectedNode = graph.nodes.find((node) => node.id === selectedNodeId);
+    if (selectedNode === undefined) {
+      return filteredGraph;
+    }
+
+    const nodes = [...filteredGraph.nodes, selectedNode].sort(
+      (a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
+    );
+
+    const visibleIds = new Set(nodes.map((node) => node.id));
+    const edges = graph.edges.filter(
+      (edge) => visibleIds.has(edge.from) && visibleIds.has(edge.to)
+    );
+
+    return { nodes, edges };
+  }, [filteredGraph, graph, selectedNodeId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (graph === undefined || visibleGraph.nodes.length === 0) {
+      setBaseLayout(emptyCanvasLayout);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void buildCanvasLayout(visibleGraph.nodes, visibleGraph.edges).then((layout) => {
+      if (!cancelled) {
+        setBaseLayout(layout);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [graph, visibleGraph.edges, visibleGraph.nodes]);
+
+  const decoratedLayout = useMemo(
+    () => decorateCanvasLayout(baseLayout, selectedNodeId, hoveredNodeId),
+    [baseLayout, hoveredNodeId, selectedNodeId]
+  );
+  const nodes = useMemo<TypeGraphFlowNode[]>(
+    () =>
+      decoratedLayout.nodes.map((node): TypeGraphFlowNode => ({
+        ...node,
+        data: {
+          ...node.data,
+          onHoverStart: handleNodeHoverStart,
+          onHoverEnd: handleNodeHoverEnd
+        }
+      })),
+    [decoratedLayout.nodes, handleNodeHoverEnd, handleNodeHoverStart]
+  );
+  const { edges } = decoratedLayout;
+  const canvasExtent = useMemo<CoordinateExtent>(
+    () => [
+      [0, 0],
+      [Math.max(baseLayout.width, 1), Math.max(baseLayout.height, 1)]
+    ],
+    [baseLayout.height, baseLayout.width]
+  );
+
+  useEffect(() => {
+    if (flowInstance === undefined || selectedNodeId === undefined) {
+      return;
+    }
+
+    const selectedNode = baseLayout.nodes.find((node) => node.id === selectedNodeId);
+    if (selectedNode === undefined) {
+      return;
+    }
+
+    const currentZoom = flowInstance.getZoom();
+    const targetZoom = Math.max(currentZoom, SELECTED_NODE_ZOOM);
+    void flowInstance.setCenter(
+      selectedNode.position.x + selectedNode.data.width / 2,
+      selectedNode.position.y + selectedNode.data.height / 2,
+      { zoom: targetZoom, duration: 360 }
+    );
+  }, [baseLayout.nodes, flowInstance, selectedNodeId]);
+
   return (
     <main className="graph-shell">
       <div className="flow-wrap">
+        <button
+          type="button"
+          className="canvas-panel-toggle left"
+          onClick={onToggleLeftPanel}
+          aria-label={leftPanelCollapsed ? "Show search panel" : "Hide search panel"}
+        >
+          {leftPanelCollapsed ? ">" : "<"}
+        </button>
+        <button
+          type="button"
+          className="canvas-panel-toggle right"
+          onClick={onToggleRightPanel}
+          aria-label={rightPanelCollapsed ? "Show inspector panel" : "Hide inspector panel"}
+        >
+          {rightPanelCollapsed ? "<" : ">"}
+        </button>
         <ReactFlow
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.16 }}
-          minZoom={0.12}
-          maxZoom={2}
+          edgeTypes={edgeTypes}
+          defaultViewport={DEFAULT_VIEWPORT}
+          translateExtent={canvasExtent}
+          nodeExtent={canvasExtent}
+          minZoom={0.035}
+          maxZoom={1.65}
           nodesDraggable={false}
           nodesConnectable={false}
+          selectionOnDrag={false}
+          selectNodesOnDrag={false}
+          selectionKeyCode={null}
+          multiSelectionKeyCode={null}
+          deleteKeyCode={null}
           proOptions={{ hideAttribution: true }}
+          onInit={(instance) => {
+            setFlowInstance(instance);
+            setViewport(instance.getViewport());
+          }}
+          onMove={(_, nextViewport) => setViewport(nextViewport)}
           onNodeClick={(_, node) => selectNode(node.id)}
           onPaneClick={clearSelection}
         >
-          <Background color="#c8cec7" gap={24} size={1} />
+          <SourceLaneLayer
+            lanes={baseLayout.lanes}
+            width={baseLayout.width}
+            height={baseLayout.height}
+          />
           <Controls position="bottom-left" showInteractive={false} />
         </ReactFlow>
+        <FixedSourceRail lanes={baseLayout.lanes} viewport={viewport} />
         <div className="canvas-status">
           <span>{loading ? "Indexing..." : "Ready"}</span>
           {graph !== undefined && (
             <span>
-              {graph.nodes.length} nodes · {graph.edges.length} edges
+              {visibleGraph.nodes.length} visible · {graph.nodes.length} total
             </span>
           )}
           {updatedAt !== undefined && (

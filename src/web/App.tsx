@@ -17,6 +17,8 @@ export function App() {
   const loadGraph = useGraphStore((state) => state.loadGraph);
   const [leftPanelWidth, setLeftPanelWidth] = useState(320);
   const [rightPanelWidth, setRightPanelWidth] = useState(390);
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
   useEffect(() => {
     void loadGraph();
@@ -65,29 +67,61 @@ export function App() {
   }
 
   const shellStyle = {
-    "--left-panel-width": `${leftPanelWidth}px`,
-    "--right-panel-width": `${rightPanelWidth}px`
+    "--left-panel-width": `${leftPanelCollapsed ? 0 : leftPanelWidth}px`,
+    "--right-panel-width": `${rightPanelCollapsed ? 0 : rightPanelWidth}px`,
+    "--left-resizer-width": leftPanelCollapsed ? "0px" : "8px",
+    "--right-resizer-width": rightPanelCollapsed ? "0px" : "8px"
   } as CSSProperties;
 
   return (
-    <div className="app-shell" style={shellStyle}>
-      <SearchPanel />
-      <div
-        className="panel-resizer"
-        role="separator"
-        aria-label="Resize search panel"
-        aria-orientation="vertical"
-        onPointerDown={(event) => beginPanelResize("left", event)}
+    <div
+      className={[
+        "app-shell",
+        leftPanelCollapsed ? "left-panel-collapsed" : "",
+        rightPanelCollapsed ? "right-panel-collapsed" : ""
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={shellStyle}
+    >
+      {leftPanelCollapsed ? (
+        <div className="panel collapsed-panel" aria-hidden="true" />
+      ) : (
+        <SearchPanel />
+      )}
+      {leftPanelCollapsed ? (
+        <div className="panel-resizer collapsed" aria-hidden="true" />
+      ) : (
+        <div
+          className="panel-resizer"
+          role="separator"
+          aria-label="Resize search panel"
+          aria-orientation="vertical"
+          onPointerDown={(event) => beginPanelResize("left", event)}
+        />
+      )}
+      <GraphCanvas
+        leftPanelCollapsed={leftPanelCollapsed}
+        rightPanelCollapsed={rightPanelCollapsed}
+        onToggleLeftPanel={() => setLeftPanelCollapsed((collapsed) => !collapsed)}
+        onToggleRightPanel={() => setRightPanelCollapsed((collapsed) => !collapsed)}
       />
-      <GraphCanvas />
-      <div
-        className="panel-resizer"
-        role="separator"
-        aria-label="Resize inspector panel"
-        aria-orientation="vertical"
-        onPointerDown={(event) => beginPanelResize("right", event)}
-      />
-      <Inspector />
+      {rightPanelCollapsed ? (
+        <div className="panel-resizer collapsed" aria-hidden="true" />
+      ) : (
+        <div
+          className="panel-resizer"
+          role="separator"
+          aria-label="Resize inspector panel"
+          aria-orientation="vertical"
+          onPointerDown={(event) => beginPanelResize("right", event)}
+        />
+      )}
+      {rightPanelCollapsed ? (
+        <div className="panel collapsed-panel" aria-hidden="true" />
+      ) : (
+        <Inspector />
+      )}
     </div>
   );
 }
