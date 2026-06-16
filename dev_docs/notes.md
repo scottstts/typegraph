@@ -2,3 +2,7 @@
 - Node build direction is `tsc` only, not `tsup`: keep `src/cli.ts` as the thin bin entrypoint so `tsc` emits `dist/cli.js`, with compiled support modules under `dist/cli`, `dist/server`, `dist/core`, and `dist/shared`.
 - Development `tg show` commands run through `tsx src/cli.ts` and should serve/proxy the GUI through Vite dev serving; they must not require `dist/web` to exist. Built `node dist/cli.js show` serves `dist/web`.
 - `playground/mock-codebase` is only a generic extraction/manual-testing target. Do not preserve or recreate the prior agent-specific domain; use small neutral fixtures that exercise TypeGraph behavior.
+- Implemented node IDs as `local:<relative-file>#<symbol>`, `primitive:<name>`, and `external:<name>`. This keeps imported local references deterministic while preserving terminal primitive/external nodes.
+- The extractor intentionally uses authored declaration text for `displayText` and records edges separately; do not replace inspector text with compiler-expanded type text.
+- Dev `show` starts Fastify for API plus a Vite dev server that proxies `/api`; built `show` serves `dist/web` from Fastify. Watch mode currently does full re-index with SSE notification.
+- TypeGraph must follow TypeScript solution/project-reference configs. A root `tsconfig.json` with `"files": []` and `references` should load referenced configs into one ts-morph project instead of indexing zero files.

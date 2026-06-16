@@ -1,11 +1,13 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
     "types": ["node", "vitest/globals"]
   },
   "include": [
-    "tests/**/*.ts",
+    "tests/*.ts",
     "src/core/**/*.ts",
     "src/shared/**/*.ts",
     "vitest.config.ts"

@@ -11,17 +11,18 @@
     "dist"
   ],
   "scripts": {
-    "dev": "tsx src/cli/cli.ts",
-    "dev:mock": "tsx src/cli/cli.ts show playground/mock-codebase",
-    "dev:mock:agent": "tsx src/cli/cli.ts show playground/mock-codebase/src/agent",
-    "export:mock": "tsx src/cli/cli.ts export playground/mock-codebase --out .tmp/mock-typegraph.json",
+    "dev": "tsx src/cli.ts",
+    "dev:mock": "tsx src/cli.ts show playground/mock-codebase",
+    "dev:mock:orders": "tsx src/cli.ts show playground/mock-codebase/src/orders",
+    "export:mock": "tsx src/cli.ts export playground/mock-codebase --out .tmp/mock-typegraph.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web && npm run typecheck:test",
     "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
     "typecheck:web": "tsc -p tsconfig.web.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
+    "lint": "eslint . --max-warnings=0",
     "test": "vitest",
     "clean": "rimraf dist .tmp",
-    "build": "npm run clean && npm run typecheck && npm run build:web && npm run build:node",
+    "build": "npm run clean && npm run lint && npm run typecheck && npm run build:web && npm run build:node",
     "build:web": "vite build",
     "build:node": "tsc -p tsconfig.node.json",
     "start": "node dist/cli.js"
@@ -43,13 +44,16 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^25.9.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
+    "eslint": "^10.5.0",
     "rimraf": "^6.1.3",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1",
     "vite": "^8.0.16",
     "vitest": "^4.1.9"
   }
