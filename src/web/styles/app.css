@@ -508,24 +508,21 @@ button {
 
 .node-hover-card {
   position: absolute;
-  z-index: 20;
-  top: 50%;
-  left: calc(100% + 14px);
+  z-index: 14;
+  top: var(--node-hover-card-top);
+  left: var(--node-hover-card-left);
   display: grid;
-  min-width: 220px;
-  max-width: 460px;
+  width: 240px;
   gap: 5px;
   border: 1px solid color-mix(in srgb, var(--node-color) 45%, var(--border));
   border-radius: 7px;
   background: rgba(255, 254, 251, 0.96);
   box-shadow: 0 14px 34px rgba(30, 36, 32, 0.12);
   color: var(--muted-strong);
-  opacity: 0;
   padding: 11px 12px;
   pointer-events: none;
   transform: translateY(-50%);
-  transition: opacity 90ms ease;
-  visibility: hidden;
+  transform-origin: left center;
   white-space: normal;
 }
 
@@ -571,13 +568,6 @@ button {
   box-shadow:
     0 0 0 5px color-mix(in srgb, var(--node-color) 18%, transparent),
     0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-.graph-node:hover .node-hover-card,
-.graph-node:focus-visible .node-hover-card,
-.graph-node.hovered .node-hover-card {
-  opacity: 1;
-  visibility: visible;
 }
 
 .canvas-panel-toggle {

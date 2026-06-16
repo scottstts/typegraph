@@ -25,6 +25,7 @@ import { NodeCard, type TypeGraphFlowNode } from "./NodeCard.js";
 
 const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 0.72 };
 const SELECTED_NODE_ZOOM = 1;
+const HOVER_CARD_SCREEN_GAP = 14;
 
 const nodeTypes: NodeTypes = {
   typeGraphNode: NodeCard
@@ -109,6 +110,47 @@ function FixedSourceRail({
           <small>{lane.nodeCount} nodes</small>
         </div>
       ))}
+    </div>
+  );
+}
+
+function NodeHoverCardOverlay({
+  node,
+  viewport
+}: {
+  node: TypeGraphFlowNode;
+  viewport: Viewport;
+}) {
+  const graphNode = node.data.graphNode;
+  const left = viewport.x + (node.position.x + node.data.width) * viewport.zoom + HOVER_CARD_SCREEN_GAP;
+  const top = viewport.y + (node.position.y + node.data.height / 2) * viewport.zoom;
+
+  return (
+    <div
+      className="node-hover-card"
+      role="tooltip"
+      style={
+        {
+          "--node-color": node.data.sourceColor,
+          "--node-hover-card-left": `${left}px`,
+          "--node-hover-card-top": `${top}px`
+        } as CSSProperties
+      }
+    >
+      <strong>{graphNode.name}</strong>
+      <span>from {graphNode.relativeFilePath ?? "generated graph"}</span>
+      <span>
+        depends on <b>{graphNode.dependsOn.length}</b>
+      </span>
+      {graphNode.dependedOnBy.length === 0 ? (
+        <span>
+          <b>Root Node</b>
+        </span>
+      ) : (
+        <span>
+          used by <b>{graphNode.dependedOnBy.length}</b>
+        </span>
+      )}
     </div>
   );
 }
@@ -305,6 +347,8 @@ export function GraphCanvas({
     );
   }, [baseLayout.nodes, flowInstance, selectedNodeId]);
 
+  const hoveredNode = decoratedLayout.nodes.find((node) => node.id === hoveredNodeId);
+
   return (
     <main className="graph-shell">
       <div className="flow-wrap">
@@ -358,6 +402,9 @@ export function GraphCanvas({
           <Controls position="bottom-left" showInteractive={false} />
         </ReactFlow>
         <FixedSourceRail lanes={baseLayout.lanes} viewport={viewport} />
+        {hoveredNode !== undefined && (
+          <NodeHoverCardOverlay node={hoveredNode} viewport={viewport} />
+        )}
         <div className="canvas-status">
           <span>{loading ? "Indexing..." : "Ready"}</span>
           {graph !== undefined && (

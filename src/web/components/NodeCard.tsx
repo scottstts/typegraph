@@ -79,22 +79,6 @@ export function NodeCard({ data }: NodeProps<TypeGraphFlowNode>) {
       <Handle type="target" position={Position.Left} />
       <span className="node-dot" aria-hidden="true" />
       <span className="node-label">{node.name}</span>
-      <span className="node-hover-card" role="tooltip">
-        <strong>{node.name}</strong>
-        <span>from {node.relativeFilePath ?? "generated graph"}</span>
-        <span>
-          depends on <b>{node.dependsOn.length}</b>
-        </span>
-        {node.dependedOnBy.length === 0 ? (
-          <span>
-            <b>Root Node</b>
-          </span>
-        ) : (
-          <span>
-            used by <b>{node.dependedOnBy.length}</b>
-          </span>
-        )}
-      </span>
       <Handle type="source" position={Position.Right} />
     </button>
   );
