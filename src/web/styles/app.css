@@ -524,6 +524,7 @@ button {
   cursor: pointer;
   text-align: left;
   transition: opacity 120ms ease;
+  touch-action: manipulation;
   user-select: none;
 }
 
@@ -929,15 +930,21 @@ button {
 }
 
 @media (max-width: 900px) {
+  html,
+  #root {
+    min-width: 0;
+  }
+
   body {
     min-width: 0;
+    overflow-x: hidden;
   }
 
   .app-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: 320px 520px minmax(320px, auto);
+    grid-template-rows: auto minmax(460px, 64svh) auto;
     height: auto;
-    min-height: 100vh;
+    min-height: 100svh;
     overflow: visible;
   }
 
@@ -945,14 +952,191 @@ button {
     display: none;
   }
 
+  .collapsed-panel {
+    display: none;
+  }
+
   .left-panel,
   .inspector {
+    width: 100%;
     overflow: visible;
   }
 
+  .left-panel {
+    gap: 14px;
+    border-bottom: 1px solid var(--border);
+    padding: max(18px, env(safe-area-inset-top)) 16px 16px;
+  }
+
+  .brand-block h1 {
+    font-size: 31px;
+  }
+
+  .brand-block p {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .field input,
+  .select-wrap select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .toggle-grid button {
+    min-height: 38px;
+    font-size: 14px;
+  }
+
+  .result-list {
+    flex: initial;
+    max-height: 260px;
+    overflow: auto;
+    padding-right: 2px;
+  }
+
+  .result strong {
+    font-size: 16px;
+  }
+
+  .graph-shell {
+    height: 64svh;
+    min-height: 460px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .source-rail-overlay {
+    width: min(var(--source-rail-width), 46vw);
+  }
+
+  .source-rail-entry {
+    padding: 10px 8px 0;
+  }
+
+  .source-rail-entry span,
+  .source-rail-entry small {
+    max-width: calc(min(var(--source-rail-width), 46vw) - 16px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 10px;
+  }
+
+  .source-rail-entry strong {
+    max-width: calc(min(var(--source-rail-width), 46vw) - 16px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
+  }
+
+  .canvas-panel-toggle.left {
+    left: 10px;
+  }
+
+  .canvas-panel-toggle.right {
+    right: 10px;
+  }
+
+  .react-flow__controls {
+    left: 10px !important;
+    bottom: 10px !important;
+  }
+
   .canvas-status {
-    right: 12px;
+    right: 10px;
     bottom: 10px;
-    max-width: calc(100% - 110px);
+    left: 54px;
+    max-width: calc(100% - 64px);
+    justify-content: flex-start;
+    gap: 6px 10px;
+    font-size: 11px;
+  }
+
+  .node-hover-card {
+    top: max(14px, min(var(--node-hover-card-top), calc(100% - 150px)));
+    left: max(14px, min(var(--node-hover-card-left), calc(100vw - 274px)));
+    width: min(260px, calc(100vw - 28px));
+    transform: none;
+  }
+
+  .inspector {
+    gap: 16px;
+    border-top: 1px solid var(--border);
+    padding: 18px 16px max(24px, env(safe-area-inset-bottom));
+  }
+
+  .inspector h2 {
+    font-size: 22px;
+  }
+
+  .display-text,
+  .source-preview {
+    font-size: 11px;
+    padding: 12px;
+  }
+
+  .inspector-empty {
+    display: grid;
+    min-height: 140px;
+    margin: 0 auto;
+    place-items: center;
+  }
+
+  .hosted-entry-shell {
+    min-height: 100svh;
+    place-items: center;
+    padding: max(24px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    grid-template-rows: auto minmax(420px, 58svh) auto;
+  }
+
+  .left-panel {
+    padding: max(16px, env(safe-area-inset-top)) 14px 14px;
+  }
+
+  .brand-block h1 {
+    font-size: 29px;
+  }
+
+  .result-list {
+    max-height: 220px;
+  }
+
+  .graph-shell {
+    height: 58svh;
+    min-height: 420px;
+  }
+
+  .source-rail-overlay {
+    width: min(var(--source-rail-width), 42vw);
+  }
+
+  .source-rail-entry span,
+  .source-rail-entry small,
+  .source-rail-entry strong {
+    max-width: calc(min(var(--source-rail-width), 42vw) - 16px);
+  }
+
+  .hosted-entry {
+    width: 100%;
+    gap: 20px;
+    padding: 24px 20px;
+  }
+
+  .hosted-entry-brand h1 {
+    font-size: 36px;
+  }
+
+  .hosted-repo-form {
+    grid-template-columns: 1fr;
+  }
+
+  .hosted-repo-form button {
+    width: 100%;
+    min-height: 44px;
   }
 }

@@ -1,7 +1,6 @@
 import { Handle, Position, type NodeProps, type Node as FlowNode } from "@xyflow/react";
 import type { CSSProperties } from "react";
 import type { TypeGraphNode } from "../../shared/graphTypes.js";
-import { useGraphStore } from "../state/graphStore.js";
 
 export type TypeGraphNodeData = {
   graphNode: TypeGraphNode;
@@ -12,6 +11,7 @@ export type TypeGraphNodeData = {
   sourceColor: string;
   width: number;
   height: number;
+  onSelect?: (nodeId: string) => void;
   onHoverStart?: (nodeId: string) => void;
   onHoverEnd?: (nodeId: string) => void;
 };
@@ -19,7 +19,6 @@ export type TypeGraphNodeData = {
 export type TypeGraphFlowNode = FlowNode<TypeGraphNodeData, "typeGraphNode">;
 
 export function NodeCard({ data }: NodeProps<TypeGraphFlowNode>) {
-  const selectNode = useGraphStore((state) => state.selectNode);
   const node = data.graphNode;
   const connectionCount = node.dependsOn.length + node.dependedOnBy.length;
   const size = Math.min(18, 10 + Math.sqrt(connectionCount) * 1.8);
@@ -72,8 +71,9 @@ export function NodeCard({ data }: NodeProps<TypeGraphFlowNode>) {
       onPointerCancel={() => data.onHoverEnd?.(node.id)}
       onDragStart={(event) => event.preventDefault()}
       onClick={(event) => {
+        event.preventDefault();
         event.stopPropagation();
-        selectNode(node.id);
+        data.onSelect?.(node.id);
       }}
     >
       <Handle type="target" position={Position.Left} />

@@ -14,6 +14,8 @@ The three-column shell contains:
 
 The left and right panels are resizable within fixed min/max widths and can be collapsed from buttons inside the canvas. In local mode, the app loads the graph on mount and opens an `EventSource` to `/api/events`; every `graph-update` event triggers a full graph reload. Hosted mode does not call local API endpoints.
 
+Below 900px, the shell becomes a stacked mobile workspace: search/filter controls, canvas, then inspector. Mobile rows should be content-driven for the panels and fixed/min-height for the canvas; do not use fixed panel rows that allow the search panel to overflow into the graph.
+
 ## Store
 
 `src/web/state/graphStore.ts` defines the Zustand store.
@@ -109,7 +111,7 @@ The canvas tracks:
 
 Viewport behavior is bounded to the source-lane surface. Minimum zoom is computed as a live cover-fit of the layout against the visible canvas, bounded by hard zoom limits. Resize corrections clamp x/y immediately so side-panel collapse does not leave blank space around the lane surface.
 
-When a selected node exists in the layout, the canvas centers it and uses at least the selected-node zoom.
+When a selected node exists in the layout, the canvas centers it and uses at least the selected-node zoom on desktop. On compact/mobile or coarse-pointer viewports, selection centers without animated zoom escalation because large React Flow transforms immediately after touch selection can make mobile browsers reload the tab under memory pressure.
 
 ## Layout
 

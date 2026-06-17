@@ -21,3 +21,5 @@
 - Hosted root URLs index the repo root; hosted subdirectory URLs index only that subtree; blob URLs are treated as single-file inputs with source metadata scoped to the containing directory.
 - Do not hydrate npm/external package declarations in hosted mode unless the product direction changes. Unresolved package/library symbols should remain external terminal nodes.
 - Very large/pathological graphs can make ELK throw stack overflows. `buildCanvasLayout` should catch ELK failures and use deterministic fallback positions so the canvas remains usable.
+- Mobile responsive layout stacks search, canvas, and inspector. Keep the search panel row auto-height with a bounded scrolling result list; fixed-height search rows can overlap the canvas as controls wrap.
+- Mobile/coarse-pointer node selection should not animate or force zoom to `1`; center at the current zoom instead. The full animated selected-node zoom is desktop-only because touch-triggered large React Flow transforms can cause mobile browser reloads.

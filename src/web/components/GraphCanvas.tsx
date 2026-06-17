@@ -36,6 +36,7 @@ const SELECTED_NODE_ZOOM = 1;
 const HOVER_CARD_SCREEN_GAP = 14;
 const VIEWPORT_POSITION_EPSILON = 0.5;
 const VIEWPORT_ZOOM_EPSILON = 0.0001;
+const COMPACT_INTERACTION_QUERY = "(max-width: 900px), (pointer: coarse)";
 
 const nodeTypes: NodeTypes = {
   typeGraphNode: NodeCard
@@ -212,6 +213,10 @@ function viewportNeedsUpdate(current: Viewport, next: Viewport): boolean {
   );
 }
 
+function usesCompactCanvasInteraction(): boolean {
+  return window.matchMedia(COMPACT_INTERACTION_QUERY).matches;
+}
+
 export function GraphCanvas({
   leftPanelCollapsed,
   rightPanelCollapsed,
@@ -300,6 +305,13 @@ export function GraphCanvas({
       }, 90);
     },
     [cancelHoverClear]
+  );
+
+  const handleCanvasNodeSelect = useCallback(
+    (nodeId: string) => {
+      selectNode(nodeId);
+    },
+    [selectNode]
   );
 
   useEffect(() => cancelHoverClear, [cancelHoverClear]);
@@ -397,11 +409,17 @@ export function GraphCanvas({
         ...node,
         data: {
           ...node.data,
+          onSelect: handleCanvasNodeSelect,
           onHoverStart: handleNodeHoverStart,
           onHoverEnd: handleNodeHoverEnd
         }
       })),
-    [decoratedLayout.nodes, handleNodeHoverEnd, handleNodeHoverStart]
+    [
+      decoratedLayout.nodes,
+      handleCanvasNodeSelect,
+      handleNodeHoverEnd,
+      handleNodeHoverStart
+    ]
   );
   const { edges } = decoratedLayout;
   const minZoom = useMemo(() => {
@@ -472,11 +490,14 @@ export function GraphCanvas({
     }
 
     const currentZoom = flowInstance.getZoom();
-    const targetZoom = Math.max(currentZoom, SELECTED_NODE_ZOOM);
+    const compactInteraction = usesCompactCanvasInteraction();
+    const targetZoom = compactInteraction
+      ? currentZoom
+      : Math.max(currentZoom, SELECTED_NODE_ZOOM);
     void flowInstance.setCenter(
       selectedNode.position.x + selectedNode.data.width / 2,
       selectedNode.position.y + selectedNode.data.height / 2,
-      { zoom: targetZoom, duration: 360 }
+      { zoom: targetZoom, duration: compactInteraction ? 0 : 360 }
     );
   }, [baseLayout.nodes, flowInstance, selectedNodeId]);
 
@@ -532,7 +553,11 @@ export function GraphCanvas({
             setViewport(instance.getViewport());
           }}
           onMove={(_, nextViewport) => setViewport(nextViewport)}
-          onNodeClick={(_, node) => selectNode(node.id)}
+          onNodeClick={(event, node) => {
+            event.preventDefault();
+            event.stopPropagation();
+            handleCanvasNodeSelect(node.id);
+          }}
           onPaneClick={clearSelection}
         >
           <SourceLaneLayer
