@@ -6,6 +6,7 @@ import type {
 import { useGraphStore } from "../state/graphStore.js";
 
 const exampleUrl = "https://github.com/microsoft/TypeScript";
+const sourceUrl = "https://github.com/scottstts/typegraph";
 
 export function HostedRepositoryEntry() {
   const setGraph = useGraphStore((state) => state.setGraph);
@@ -16,12 +17,14 @@ export function HostedRepositoryEntry() {
   const workerRef = useRef<Worker | undefined>(undefined);
   const requestIdRef = useRef(0);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    document.body.classList.add("hosted-entry-active");
+
+    return () => {
+      document.body.classList.remove("hosted-entry-active");
       workerRef.current?.terminate();
-    },
-    []
-  );
+    };
+  }, []);
 
   function startAnalysis(event: SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -70,35 +73,58 @@ export function HostedRepositoryEntry() {
     worker.postMessage(request);
   }
 
+  const statusClassName = ["hosted-entry-status", error ? "error" : "", running ? "running" : ""]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <main className="hosted-entry-shell">
-      <section className="hosted-entry">
-        <div className="hosted-entry-brand">
-          <h1>TypeGraph</h1>
-          <p>GitHub repository analysis</p>
+      <section className="hosted-entry" aria-labelledby="hosted-entry-title">
+        <div className="hosted-entry-copy">
+          <a
+            className="hosted-source-link"
+            href={sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Open TypeGraph source repository on GitHub"
+          >
+            <i className="fa-brands fa-github" aria-hidden="true" />
+            <span>TypeGraph</span>
+          </a>
+
+          <p className="hosted-entry-kicker">Public GitHub intake</p>
+          <h1 id="hosted-entry-title">TypeGraph</h1>
+          <p className="hosted-entry-lede">
+            Turn a public TypeScript repository into a type graph. Help you understand project-owned types/interfaces/classes.
+          </p>
         </div>
 
         <form className="hosted-repo-form" onSubmit={startAnalysis}>
-          <label className="field">
-            <span>Repository</span>
+          <label className="field hosted-repo-field" htmlFor="hosted-repository-url">
+            <span>Repository URL</span>
             <input
+              id="hosted-repository-url"
               value={input}
               placeholder={exampleUrl}
               autoComplete="off"
               autoCapitalize="none"
               spellCheck={false}
               disabled={running}
+              aria-describedby="hosted-repo-hint"
               onChange={(event) => setInput(event.currentTarget.value)}
             />
           </label>
           <button type="submit" disabled={running || input.trim() === ""}>
             {running ? "Analyzing" : "Analyze"}
           </button>
+          <p id="hosted-repo-hint" className="hosted-repo-hint">
+            Repo root, branch, subdirectory, and blob URLs are supported.
+          </p>
+          <p className={statusClassName} aria-live="polite">
+            <span aria-hidden="true" />
+            {error ?? status}
+          </p>
         </form>
-
-        <p className="hosted-entry-status" aria-live="polite">
-          {error ?? status}
-        </p>
       </section>
     </main>
   );

@@ -30,3 +30,7 @@ If no ref is present, hosted mode uses the repository default branch. For `/tree
 Downloaded files are limited to TypeScript source files plus `tsconfig*.json` and `package.json`. Hosted mode keeps the same local exclusions for `node_modules`, `dist`, and `.tmp`. External package types are intentionally not hydrated; unresolved package/library references remain external terminal nodes.
 
 If GitHub reports a truncated tree, hosted mode fails with a prompt to use a smaller subdirectory URL instead of indexing partial data.
+
+## Hosted Intake UI
+
+The hosted intake page is intentionally a focused reception screen, not a full SaaS landing page. It keeps one repository URL form, a concise explanation of browser-side GitHub analysis, a small abstract type-graph panel, and a GitHub source link to `scottstts/typegraph`. The source link uses the Font Awesome GitHub brand icon loaded from `index.html`.
