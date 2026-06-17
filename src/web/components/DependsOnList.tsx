@@ -1,21 +1,20 @@
-import type { TypeGraphNode, TypeGraphPayload } from "../../shared/graphTypes.js";
+import type { TypeGraphNode } from "../../shared/graphTypes.js";
 import { kindLabel } from "../graphUi.js";
 import { useGraphStore } from "../state/graphStore.js";
 
 type NodeListProps = {
-  graph: TypeGraphPayload;
+  nodesById: ReadonlyMap<string, TypeGraphNode>;
   node: TypeGraphNode;
 };
 
 function LinkedNodeList({
   ids,
-  graph
+  nodesById
 }: {
   ids: string[];
-  graph: TypeGraphPayload;
+  nodesById: ReadonlyMap<string, TypeGraphNode>;
 }) {
   const selectNode = useGraphStore((state) => state.selectNode);
-  const nodesById = new Map(graph.nodes.map((candidate) => [candidate.id, candidate]));
 
   if (ids.length === 0) {
     return <p className="empty">None</p>;
@@ -40,10 +39,10 @@ function LinkedNodeList({
   );
 }
 
-export function DependsOnList({ graph, node }: NodeListProps) {
-  return <LinkedNodeList ids={node.dependsOn} graph={graph} />;
+export function DependsOnList({ nodesById, node }: NodeListProps) {
+  return <LinkedNodeList ids={node.dependsOn} nodesById={nodesById} />;
 }
 
-export function DependedOnByList({ graph, node }: NodeListProps) {
-  return <LinkedNodeList ids={node.dependedOnBy} graph={graph} />;
+export function DependedOnByList({ nodesById, node }: NodeListProps) {
+  return <LinkedNodeList ids={node.dependedOnBy} nodesById={nodesById} />;
 }

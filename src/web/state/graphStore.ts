@@ -142,8 +142,14 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     }
   },
 
-  selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
-  clearSelection: () => set({ selectedNodeId: undefined }),
+  selectNode: (nodeId) =>
+    set((state) =>
+      state.selectedNodeId === nodeId ? state : { selectedNodeId: nodeId }
+    ),
+  clearSelection: () =>
+    set((state) =>
+      state.selectedNodeId === undefined ? state : { selectedNodeId: undefined }
+    ),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setShowPrimitives: (showPrimitives) => set({ showPrimitives }),
   setShowExternal: (showExternal) => set({ showExternal }),

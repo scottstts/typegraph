@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { ReactNode } from "react";
-import type { TypeGraphNode, TypeGraphPayload } from "../../shared/graphTypes.js";
+import type { TypeGraphNode } from "../../shared/graphTypes.js";
 import { kindLabel, usageLabel } from "../graphUi.js";
 import { useGraphStore } from "../state/graphStore.js";
 import { DependedOnByList, DependsOnList } from "./DependsOnList.js";
@@ -52,8 +52,10 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function buildReferenceMap(graph: TypeGraphPayload, node: TypeGraphNode): Map<string, string> {
-  const nodesById = new Map(graph.nodes.map((candidate) => [candidate.id, candidate]));
+function buildReferenceMap(
+  nodesById: ReadonlyMap<string, TypeGraphNode>,
+  node: TypeGraphNode
+): Map<string, string> {
   const references = new Map<string, string>();
 
   for (const id of node.dependsOn) {
@@ -145,16 +147,16 @@ function tokenizeDisplayText(text: string, references: Map<string, string>): Tok
 }
 
 function ClickableDisplayText({
-  graph,
+  nodesById,
   node
 }: {
-  graph: TypeGraphPayload;
+  nodesById: ReadonlyMap<string, TypeGraphNode>;
   node: TypeGraphNode;
 }) {
   const selectNode = useGraphStore((state) => state.selectNode);
   const tokens = useMemo(
-    () => tokenizeDisplayText(node.displayText, buildReferenceMap(graph, node)),
-    [graph, node]
+    () => tokenizeDisplayText(node.displayText, buildReferenceMap(nodesById, node)),
+    [node, nodesById]
   );
 
   return (
@@ -208,10 +210,18 @@ function RelationshipSection({
 export function Inspector() {
   const graph = useGraphStore((state) => state.graph);
   const selectedNodeId = useGraphStore((state) => state.selectedNodeId);
+  const nodesById = useMemo(
+    () =>
+      graph === undefined
+        ? undefined
+        : new Map(graph.nodes.map((candidate) => [candidate.id, candidate])),
+    [graph]
+  );
 
-  const node = graph?.nodes.find((candidate) => candidate.id === selectedNodeId);
+  const node =
+    selectedNodeId === undefined ? undefined : nodesById?.get(selectedNodeId);
 
-  if (graph === undefined || node === undefined) {
+  if (graph === undefined || nodesById === undefined || node === undefined) {
     return (
       <aside className="panel inspector">
         <p className="empty inspector-empty">Select a node to inspect details.</p>
@@ -240,11 +250,11 @@ export function Inspector() {
 
       <section>
         <h3>Declaration</h3>
-        <ClickableDisplayText graph={graph} node={node} />
+        <ClickableDisplayText nodesById={nodesById} node={node} />
       </section>
 
       <RelationshipSection title="Depends On" count={node.dependsOn.length}>
-        <DependsOnList graph={graph} node={node} />
+        <DependsOnList nodesById={nodesById} node={node} />
       </RelationshipSection>
 
       <RelationshipSection
@@ -254,7 +264,7 @@ export function Inspector() {
         {node.dependedOnBy.length === 0 ? (
           <p className="empty">No incoming type references.</p>
         ) : (
-          <DependedOnByList graph={graph} node={node} />
+          <DependedOnByList nodesById={nodesById} node={node} />
         )}
       </RelationshipSection>
     </aside>

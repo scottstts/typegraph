@@ -25,6 +25,12 @@ import {
   type CanvasLayout,
   type SourceLane
 } from "../graphLayout.js";
+import {
+  clampViewportToLaneSurface,
+  nodeIsVisibleInViewport,
+  viewportNeedsUpdate,
+  type CanvasSize
+} from "../graphViewport.js";
 import { useGraphStore } from "../state/graphStore.js";
 import { CanvasEdge, type TypeGraphFlowEdge } from "./CanvasEdge.js";
 import { NodeCard, type TypeGraphFlowNode } from "./NodeCard.js";
@@ -34,8 +40,6 @@ const ABSOLUTE_MIN_ZOOM = 0.035;
 const MAX_ZOOM = 1.65;
 const SELECTED_NODE_ZOOM = 1;
 const HOVER_CARD_SCREEN_GAP = 14;
-const VIEWPORT_POSITION_EPSILON = 0.5;
-const VIEWPORT_ZOOM_EPSILON = 0.0001;
 const COMPACT_INTERACTION_QUERY = "(max-width: 900px), (pointer: coarse)";
 
 const nodeTypes: NodeTypes = {
@@ -176,45 +180,28 @@ type GraphCanvasProps = {
 
 type FlowInstance = ReactFlowInstance<TypeGraphFlowNode, TypeGraphFlowEdge>;
 
-type CanvasSize = {
-  width: number;
-  height: number;
-};
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-function clampViewportToLaneSurface(
-  viewport: Viewport,
-  canvasSize: CanvasSize,
-  layout: CanvasLayout,
-  minZoom: number
-): Viewport {
-  const zoom = Math.min(MAX_ZOOM, Math.max(viewport.zoom, minZoom));
-  const scaledWidth = layout.width * zoom;
-  const scaledHeight = layout.height * zoom;
-  const minX = Math.min(layout.sourceRailWidth, canvasSize.width - scaledWidth);
-  const maxX = layout.sourceRailWidth;
-  const minY = Math.min(0, canvasSize.height - scaledHeight);
-
-  return {
-    x: clamp(viewport.x, minX, maxX),
-    y: clamp(viewport.y, minY, 0),
-    zoom
-  };
-}
-
-function viewportNeedsUpdate(current: Viewport, next: Viewport): boolean {
-  return (
-    Math.abs(current.x - next.x) > VIEWPORT_POSITION_EPSILON ||
-    Math.abs(current.y - next.y) > VIEWPORT_POSITION_EPSILON ||
-    Math.abs(current.zoom - next.zoom) > VIEWPORT_ZOOM_EPSILON
-  );
-}
-
 function usesCompactCanvasInteraction(): boolean {
   return window.matchMedia(COMPACT_INTERACTION_QUERY).matches;
+}
+
+function useCompactCanvasInteraction(): boolean {
+  const [compactInteraction, setCompactInteraction] = useState(() =>
+    usesCompactCanvasInteraction()
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(COMPACT_INTERACTION_QUERY);
+
+    function handleChange(): void {
+      setCompactInteraction(mediaQuery.matches);
+    }
+
+    handleChange();
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  return compactInteraction;
 }
 
 export function GraphCanvas({
@@ -242,6 +229,7 @@ export function GraphCanvas({
   const [viewport, setViewport] = useState<Viewport>(DEFAULT_VIEWPORT);
   const [flowInstance, setFlowInstance] = useState<FlowInstance | undefined>();
   const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width: 0, height: 0 });
+  const compactInteraction = useCompactCanvasInteraction();
   const flowWrapRef = useRef<HTMLDivElement | null>(null);
   const hoverClearTimeout = useRef<number | undefined>(undefined);
 
@@ -288,14 +276,22 @@ export function GraphCanvas({
 
   const handleNodeHoverStart = useCallback(
     (nodeId: string) => {
+      if (compactInteraction) {
+        return;
+      }
+
       cancelHoverClear();
       setHoveredNodeId(nodeId);
     },
-    [cancelHoverClear]
+    [cancelHoverClear, compactInteraction]
   );
 
   const handleNodeHoverEnd = useCallback(
     (nodeId: string) => {
+      if (compactInteraction) {
+        return;
+      }
+
       cancelHoverClear();
       hoverClearTimeout.current = window.setTimeout(() => {
         setHoveredNodeId((currentNodeId) =>
@@ -304,7 +300,7 @@ export function GraphCanvas({
         hoverClearTimeout.current = undefined;
       }, 90);
     },
-    [cancelHoverClear]
+    [cancelHoverClear, compactInteraction]
   );
 
   const handleCanvasNodeSelect = useCallback(
@@ -315,6 +311,13 @@ export function GraphCanvas({
   );
 
   useEffect(() => cancelHoverClear, [cancelHoverClear]);
+
+  useEffect(() => {
+    if (compactInteraction) {
+      cancelHoverClear();
+      setHoveredNodeId(undefined);
+    }
+  }, [cancelHoverClear, compactInteraction]);
 
   const filteredGraph = useMemo(() => {
     if (graph === undefined) {
@@ -400,8 +403,11 @@ export function GraphCanvas({
   }, [graph, visibleGraph.edges, visibleGraph.nodes]);
 
   const decoratedLayout = useMemo(
-    () => decorateCanvasLayout(baseLayout, selectedNodeId, hoveredNodeId),
-    [baseLayout, hoveredNodeId, selectedNodeId]
+    () =>
+      compactInteraction
+        ? { nodes: baseLayout.nodes, edges: baseLayout.edges }
+        : decorateCanvasLayout(baseLayout, selectedNodeId, hoveredNodeId),
+    [baseLayout, compactInteraction, hoveredNodeId, selectedNodeId]
   );
   const nodes = useMemo<TypeGraphFlowNode[]>(
     () =>
@@ -409,6 +415,7 @@ export function GraphCanvas({
         ...node,
         data: {
           ...node.data,
+          useStoreSelection: compactInteraction,
           onSelect: handleCanvasNodeSelect,
           onHoverStart: handleNodeHoverStart,
           onHoverEnd: handleNodeHoverEnd
@@ -416,6 +423,7 @@ export function GraphCanvas({
       })),
     [
       decoratedLayout.nodes,
+      compactInteraction,
       handleCanvasNodeSelect,
       handleNodeHoverEnd,
       handleNodeHoverStart
@@ -470,7 +478,8 @@ export function GraphCanvas({
       currentViewport,
       canvasSize,
       baseLayout,
-      minZoom
+      minZoom,
+      MAX_ZOOM
     );
     if (!viewportNeedsUpdate(currentViewport, nextViewport)) {
       return;
@@ -490,7 +499,14 @@ export function GraphCanvas({
     }
 
     const currentZoom = flowInstance.getZoom();
-    const compactInteraction = usesCompactCanvasInteraction();
+    const currentViewport = flowInstance.getViewport();
+    if (
+      compactInteraction &&
+      nodeIsVisibleInViewport(selectedNode, currentViewport, canvasSize)
+    ) {
+      return;
+    }
+
     const targetZoom = compactInteraction
       ? currentZoom
       : Math.max(currentZoom, SELECTED_NODE_ZOOM);
@@ -499,7 +515,7 @@ export function GraphCanvas({
       selectedNode.position.y + selectedNode.data.height / 2,
       { zoom: targetZoom, duration: compactInteraction ? 0 : 360 }
     );
-  }, [baseLayout.nodes, flowInstance, selectedNodeId]);
+  }, [baseLayout.nodes, canvasSize, compactInteraction, flowInstance, selectedNodeId]);
 
   const hoveredNode = decoratedLayout.nodes.find((node) => node.id === hoveredNodeId);
 
@@ -542,6 +558,7 @@ export function GraphCanvas({
           maxZoom={MAX_ZOOM}
           nodesDraggable={false}
           nodesConnectable={false}
+          onlyRenderVisibleElements={compactInteraction}
           selectionOnDrag={false}
           selectNodesOnDrag={false}
           selectionKeyCode={null}
@@ -552,7 +569,13 @@ export function GraphCanvas({
             setFlowInstance(instance);
             setViewport(instance.getViewport());
           }}
-          onMove={(_, nextViewport) => setViewport(nextViewport)}
+          onMove={(_, nextViewport) =>
+            setViewport((currentViewport) =>
+              viewportNeedsUpdate(currentViewport, nextViewport)
+                ? nextViewport
+                : currentViewport
+            )
+          }
           onNodeClick={(event, node) => {
             event.preventDefault();
             event.stopPropagation();

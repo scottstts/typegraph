@@ -1,6 +1,7 @@
 import { Handle, Position, type NodeProps, type Node as FlowNode } from "@xyflow/react";
 import type { CSSProperties } from "react";
 import type { TypeGraphNode } from "../../shared/graphTypes.js";
+import { useGraphStore } from "../state/graphStore.js";
 
 export type TypeGraphNodeData = {
   graphNode: TypeGraphNode;
@@ -11,6 +12,7 @@ export type TypeGraphNodeData = {
   sourceColor: string;
   width: number;
   height: number;
+  useStoreSelection?: boolean;
   onSelect?: (nodeId: string) => void;
   onHoverStart?: (nodeId: string) => void;
   onHoverEnd?: (nodeId: string) => void;
@@ -20,6 +22,10 @@ export type TypeGraphFlowNode = FlowNode<TypeGraphNodeData, "typeGraphNode">;
 
 export function NodeCard({ data }: NodeProps<TypeGraphFlowNode>) {
   const node = data.graphNode;
+  const storeSelectedNodeId = useGraphStore((state) => state.selectedNodeId);
+  const selected = data.useStoreSelection
+    ? storeSelectedNodeId === node.id
+    : data.selected;
   const connectionCount = node.dependsOn.length + node.dependedOnBy.length;
   const size = Math.min(18, 10 + Math.sqrt(connectionCount) * 1.8);
   const style = {
@@ -54,7 +60,7 @@ export function NodeCard({ data }: NodeProps<TypeGraphFlowNode>) {
         "nodrag",
         "nopan",
         node.kind,
-        data.selected ? "selected" : "",
+        selected ? "selected" : "",
         data.focused ? "focused" : "",
         data.hovered ? "hovered" : "",
         data.dimmed ? "dimmed" : ""
