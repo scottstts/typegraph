@@ -12,6 +12,7 @@ Shared graph types are defined in `src/shared/graphTypes.ts`.
 - `tsconfigPath`, the config used for indexing.
 - optional `scopePath`, currently metadata describing the selected scope.
 - `indexedAt`, an ISO timestamp from extraction time.
+- optional `source`, currently used by hosted GitHub analysis to record owner, repo, ref, default branch, URL, and optional repo-relative scope path.
 - `nodes`, the extracted type nodes.
 - `edges`, the directed dependency edges.
 
@@ -40,6 +41,8 @@ If no `projectPath` is supplied, discovery walks upward from the target director
 `loadTsMorphProject` in `src/core/loadTsMorphProject.ts` creates a ts-morph `Project` from the discovered tsconfig.
 
 It also follows TypeScript project references recursively. This matters for solution-style root configs with `"files": []`: if the root project contains no non-declaration source files and has references, the first referenced config becomes the primary ts-morph project, and the rest of the referenced configs are added with `addSourceFilesFromTsConfig`.
+
+Browser-hosted analysis uses `indexVirtualProject` in `src/core/indexVirtualProject.ts`. It writes fetched repository files into ts-morph's `InMemoryFileSystemHost`, prefers a real `tsconfig.json` when one exists inside the virtual project root, creates `tsconfig.typegraph.json` otherwise, and explicitly adds all fetched TS/TSX/MTS/CTS source files. This keeps hosted analysis independent of a real filesystem while preserving the same `extractGraph` payload path.
 
 ## Extraction Flow
 

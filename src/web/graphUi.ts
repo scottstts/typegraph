@@ -21,6 +21,23 @@ export function projectDirectoryName(projectRoot: string): string {
   return lastSlash === -1 ? normalized : normalized.slice(lastSlash + 1);
 }
 
+export function projectDisplayName(graph: TypeGraphPayload): string {
+  if (graph.source?.kind === "github") {
+    return `${graph.source.owner}/${graph.source.repo}`;
+  }
+
+  return projectDirectoryName(graph.projectRoot);
+}
+
+export function projectDisplayDetail(graph: TypeGraphPayload): string | undefined {
+  if (graph.source?.kind !== "github") {
+    return undefined;
+  }
+
+  const scope = graph.source.scopePath ?? "root";
+  return `${graph.source.ref} · ${scope}`;
+}
+
 export function nodeMatchesKind(
   node: TypeGraphNode,
   kindFilters: KindFilters

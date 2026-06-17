@@ -1,4 +1,3 @@
-import path from "node:path";
 import {
   Node,
   SyntaxKind,
@@ -29,7 +28,7 @@ import type {
   TypeGraphPayload
 } from "../shared/graphTypes.js";
 import { formatDisplayText } from "./formatDisplayText.js";
-import { displayPath, isInsidePath } from "./pathUtils.js";
+import { dirname, displayPath, isInsidePath, normalizePath } from "./pathUtils.js";
 import {
   createExternalNode,
   createPrimitiveNode,
@@ -55,6 +54,7 @@ type ExtractGraphOptions = {
   projectRoot: string;
   tsconfigPath: string;
   scopePath?: string;
+  source?: TypeGraphPayload["source"];
 };
 
 type LocalDeclarationRecord = {
@@ -88,7 +88,7 @@ function isProjectSourceFile(sourceFile: SourceFile, projectRoot: string): boole
     return false;
   }
 
-  const normalized = filePath.split(path.sep).join("/");
+  const normalized = normalizePath(filePath);
   return !(
     normalized.includes("/node_modules/") ||
     normalized.includes("/dist/") ||
@@ -155,7 +155,7 @@ function createLocalNode(
     members: [],
     dependsOn: [],
     dependedOnBy: [],
-    scopePath: path.dirname(filePath),
+    scopePath: dirname(filePath),
     isProjectLocal: true,
     isPrimitiveLike: false,
     isExternal: false
@@ -885,6 +885,7 @@ export function extractGraph(options: ExtractGraphOptions): TypeGraphPayload {
     tsconfigPath: options.tsconfigPath,
     ...(options.scopePath === undefined ? {} : { scopePath: options.scopePath }),
     indexedAt: new Date().toISOString(),
+    ...(options.source === undefined ? {} : { source: options.source }),
     nodes: [...context.nodes.values()].sort((a, b) => a.id.localeCompare(b.id)),
     edges: [...context.edges.values()].sort((a, b) => a.id.localeCompare(b.id))
   };

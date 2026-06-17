@@ -3,7 +3,8 @@ import type { TypeGraphNode } from "../../shared/graphTypes.js";
 import {
   kindLabel,
   nodeMatchesFilters,
-  projectDirectoryName,
+  projectDisplayDetail,
+  projectDisplayName,
   usageLabel
 } from "../graphUi.js";
 import { useGraphStore, type KindFilters } from "../state/graphStore.js";
@@ -65,12 +66,19 @@ export function SearchPanel() {
     showExternal,
     showPrimitives
   ]);
+  const projectName = graph === undefined ? "Loading project" : projectDisplayName(graph);
+  const projectDetail = graph === undefined ? undefined : projectDisplayDetail(graph);
 
   return (
     <aside className="panel left-panel">
       <div className="brand-block">
         <h1>TypeGraph</h1>
-        <p>{graph === undefined ? "Loading project" : projectDirectoryName(graph.projectRoot)}</p>
+        <p title={projectName}>{projectName}</p>
+        {projectDetail !== undefined && (
+          <p className="brand-detail" title={projectDetail}>
+            {projectDetail}
+          </p>
+        )}
       </div>
 
       <label className="field">

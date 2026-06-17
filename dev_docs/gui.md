@@ -4,13 +4,15 @@ The GUI lives in `src/web` and is a Vite React application. It consumes the loca
 
 ## Application Shell
 
-`src/web/App.tsx` owns the three-column shell:
+`src/web/App.tsx` chooses runtime mode by browser hostname. Localhost, `127.0.0.1`, and `::1` keep the local API-backed behavior. Non-local origins show the hosted GitHub repository intake first, then render the same three-column shell after browser-side indexing completes.
+
+The three-column shell contains:
 
 - left search/filter panel
 - central graph canvas
 - right inspector panel
 
-The left and right panels are resizable within fixed min/max widths and can be collapsed from buttons inside the canvas. The app loads the graph on mount and opens an `EventSource` to `/api/events`; every `graph-update` event triggers a full graph reload.
+The left and right panels are resizable within fixed min/max widths and can be collapsed from buttons inside the canvas. In local mode, the app loads the graph on mount and opens an `EventSource` to `/api/events`; every `graph-update` event triggers a full graph reload. Hosted mode does not call local API endpoints.
 
 ## Store
 
@@ -38,7 +40,9 @@ Defaults are:
 - local orphan declarations excluded
 - all local declaration kinds enabled
 
-`loadGraph` fetches `/api/graph`. `applyScope` posts to `/api/scope`. Both preserve the current selection only if the selected node still exists in the returned graph.
+`loadGraph` fetches `/api/graph`. `applyScope` posts to `/api/scope` for local graphs. For hosted GitHub graphs, `applyScope` only updates payload metadata client-side to avoid calling the absent local backend. Both preserve the current selection only if the selected node still exists in the returned graph.
+
+Hosted analysis is run from `src/web/hosted/indexWorker.ts`. The worker fetches public GitHub repository data, builds a virtual ts-morph project, indexes it, and returns the same `TypeGraphPayload` used by local mode.
 
 ## API Client
 
@@ -84,6 +88,8 @@ The canvas and search panel both use the same filter function. The canvas additi
 
 Each result shows the node name, kind, file location, dependency count, and usage count/root-node label. Selecting a result updates `selectedNodeId`.
 
+For hosted GitHub graphs, the brand block below `TypeGraph` shows `owner/repo` and a compact `branch · scope` line. Local graphs continue to show the local project directory name.
+
 `ScopeSelector` builds options from project-local node file directories. Selecting a directory posts its absolute directory path to `/api/scope`. Current server behavior records scope metadata only; the GUI does not receive a filtered graph from scope changes.
 
 ## Canvas
@@ -110,6 +116,8 @@ When a selected node exists in the layout, the canvas centers it and uses at lea
 `src/web/graphLayout.ts` builds the React Flow layout.
 
 Layout uses ELK's layered algorithm with rightward dependency direction and spline routing. ELK computes relative dependency ordering, then TypeGraph projects nodes into horizontal source-file lanes.
+
+If ELK fails on a very large or pathological visible graph, `buildCanvasLayout` falls back to a deterministic lane layout instead of rejecting. The fallback preserves source lanes, node rendering, filtering, selection, and edge rendering, but dependency ordering is less refined.
 
 Important layout concepts:
 

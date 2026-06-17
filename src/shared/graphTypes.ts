@@ -82,6 +82,18 @@ export type TypeGraphEdge = {
   kind: TypeGraphEdgeKind;
 };
 
+export type GitHubGraphSource = {
+  kind: "github";
+  owner: string;
+  repo: string;
+  ref: string;
+  defaultBranch: string;
+  scopePath?: string;
+  url: string;
+};
+
+export type TypeGraphSource = GitHubGraphSource;
+
 export type GraphScope = {
   projectRoot: string;
   scopePath?: string;
@@ -92,6 +104,7 @@ export type TypeGraphPayload = {
   tsconfigPath: string;
   scopePath?: string;
   indexedAt: string;
+  source?: TypeGraphSource;
   nodes: TypeGraphNode[];
   edges: TypeGraphEdge[];
 };
@@ -118,4 +131,3 @@ export type GraphSummary = {
   externalCount: number;
   edgeCount: number;
 };
-

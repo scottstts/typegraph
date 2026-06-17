@@ -1,7 +1,9 @@
 import { type CSSProperties, type PointerEvent, useEffect, useState } from "react";
 import { GraphCanvas } from "./components/GraphCanvas.js";
+import { HostedRepositoryEntry } from "./components/HostedRepositoryEntry.js";
 import { Inspector } from "./components/Inspector.js";
 import { SearchPanel } from "./components/SearchPanel.js";
+import { isLocalOrigin } from "./runtimeMode.js";
 import { useGraphStore } from "./state/graphStore.js";
 
 const MIN_LEFT_PANEL_WIDTH = 260;
@@ -15,23 +17,31 @@ function clamp(value: number, min: number, max: number): number {
 
 export function App() {
   const loadGraph = useGraphStore((state) => state.loadGraph);
+  const graph = useGraphStore((state) => state.graph);
   const [leftPanelWidth, setLeftPanelWidth] = useState(320);
   const [rightPanelWidth, setRightPanelWidth] = useState(390);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const localMode = isLocalOrigin(window.location);
 
   useEffect(() => {
-    void loadGraph();
-  }, [loadGraph]);
+    if (localMode) {
+      void loadGraph();
+    }
+  }, [loadGraph, localMode]);
 
   useEffect(() => {
+    if (!localMode) {
+      return undefined;
+    }
+
     const events = new EventSource("/api/events");
     events.addEventListener("graph-update", () => {
       void loadGraph();
     });
 
     return () => events.close();
-  }, [loadGraph]);
+  }, [loadGraph, localMode]);
 
   function beginPanelResize(
     panel: "left" | "right",
@@ -72,6 +82,10 @@ export function App() {
     "--left-resizer-width": leftPanelCollapsed ? "0px" : "8px",
     "--right-resizer-width": rightPanelCollapsed ? "0px" : "8px"
   } as CSSProperties;
+
+  if (!localMode && graph === undefined) {
+    return <HostedRepositoryEntry />;
+  }
 
   return (
     <div

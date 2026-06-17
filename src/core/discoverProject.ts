@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { isInsidePath, normalizeAbsolutePath } from "./pathUtils.js";
+import { isInsidePath } from "./pathUtils.js";
 
 export type ProjectDiscoveryOptions = {
   cwd?: string;
@@ -38,7 +38,7 @@ async function getExistingPathStat(filePath: string): Promise<{
 }
 
 async function findNearestTsconfig(startPath: string): Promise<string | undefined> {
-  let current = normalizeAbsolutePath(startPath);
+  let current = path.resolve(startPath);
 
   for (;;) {
     const candidate = path.join(current, "tsconfig.json");
@@ -58,8 +58,8 @@ async function findNearestTsconfig(startPath: string): Promise<string | undefine
 export async function discoverProject(
   options: ProjectDiscoveryOptions = {}
 ): Promise<ProjectDiscovery> {
-  const cwd = normalizeAbsolutePath(options.cwd ?? process.cwd());
-  const targetPath = normalizeAbsolutePath(
+  const cwd = path.resolve(options.cwd ?? process.cwd());
+  const targetPath = path.resolve(
     options.targetPath === undefined ? cwd : path.resolve(cwd, options.targetPath)
   );
 
@@ -76,7 +76,7 @@ export async function discoverProject(
   const tsconfigPath =
     options.projectPath === undefined
       ? await findNearestTsconfig(targetStartDirectory)
-      : normalizeAbsolutePath(path.resolve(cwd, options.projectPath));
+      : path.resolve(cwd, options.projectPath);
 
   if (tsconfigPath === undefined) {
     throw new Error(`Could not find tsconfig.json from ${targetStartDirectory}`);

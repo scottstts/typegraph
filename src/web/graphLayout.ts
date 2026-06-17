@@ -16,6 +16,9 @@ const LANE_TOP_PADDING = 58;
 const LANE_BOTTOM_PADDING = 58;
 const NODE_ROW_GAP = 84;
 const X_SCALE = 1.42;
+const FALLBACK_LAYER_WIDTH = 260;
+const FALLBACK_MAX_LAYER = 12;
+const FALLBACK_RELAXATION_LIMIT = 64;
 const MIN_NODE_WIDTH = 58;
 const NODE_DOT_LABEL_GAP = 8;
 const NODE_LABEL_RIGHT_PADDING = 4;
@@ -298,6 +301,64 @@ function elkPositions(layout: ElkNode): Map<string, ElkPosition> {
   );
 }
 
+function fallbackPositions(
+  nodes: TypeGraphNode[],
+  edges: TypeGraphEdge[]
+): Map<string, ElkPosition> {
+  const sortedNodes = [...nodes].sort(nodeSort);
+  const visibleIds = new Set(sortedNodes.map((node) => node.id));
+  const depths = new Map(sortedNodes.map((node) => [node.id, 0]));
+
+  for (
+    let iteration = 0;
+    iteration < Math.min(FALLBACK_RELAXATION_LIMIT, sortedNodes.length);
+    iteration += 1
+  ) {
+    let changed = false;
+    for (const edge of edges) {
+      if (!visibleIds.has(edge.from) || !visibleIds.has(edge.to)) {
+        continue;
+      }
+
+      const nextDepth = Math.min(
+        FALLBACK_MAX_LAYER,
+        (depths.get(edge.from) ?? 0) + 1
+      );
+      if (nextDepth > (depths.get(edge.to) ?? 0)) {
+        depths.set(edge.to, nextDepth);
+        changed = true;
+      }
+    }
+
+    if (!changed) {
+      break;
+    }
+  }
+
+  return new Map(
+    sortedNodes.map((node, index) => [
+      node.id,
+      {
+        x: (depths.get(node.id) ?? 0) * FALLBACK_LAYER_WIDTH,
+        y: index * NODE_ROW_GAP
+      }
+    ])
+  );
+}
+
+async function layoutPositions(
+  nodes: TypeGraphNode[],
+  edges: TypeGraphEdge[]
+): Promise<Map<string, ElkPosition>> {
+  try {
+    return elkPositions(await elk.layout(buildElkGraph(nodes, edges)));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Falling back to deterministic graph layout after ELK failed: ${message}`);
+    return fallbackPositions(nodes, edges);
+  }
+}
+
 function laneNodeOrder(
   draft: LaneDraft,
   nodesById: Map<string, TypeGraphNode>,
@@ -358,8 +419,7 @@ export async function buildCanvasLayout(
   const nodesById = new Map(visibleNodes.map((node) => [node.id, node]));
   const laneDrafts = buildLaneDrafts(visibleNodes);
   const sourceRailWidthValue = sourceRailWidth(laneDrafts);
-  const layout = await elk.layout(buildElkGraph(visibleNodes, visibleEdges));
-  const positions = elkPositions(layout);
+  const positions = await layoutPositions(visibleNodes, visibleEdges);
   const minX = Math.min(...visibleNodes.map((node) => positions.get(node.id)?.x ?? 0));
   const maxRight = Math.max(
     ...visibleNodes.map((node) => {

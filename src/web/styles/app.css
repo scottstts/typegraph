@@ -127,6 +127,92 @@ button {
   font-weight: 560;
 }
 
+.brand-block .brand-detail {
+  margin-top: 3px;
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.hosted-entry-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent-soft) 40%, transparent) 0 1px, transparent 1px 100%),
+    linear-gradient(180deg, color-mix(in srgb, var(--accent-soft) 35%, transparent) 0 1px, transparent 1px 100%),
+    var(--surface-soft);
+  background-size: 36px 36px;
+  padding: 36px;
+}
+
+.hosted-entry {
+  display: grid;
+  width: min(560px, 100%);
+  gap: 24px;
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--surface) 94%, white);
+  padding: 28px 30px 30px;
+  box-shadow: 0 18px 48px rgba(34, 40, 36, 0.09);
+}
+
+.hosted-entry-brand h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 42px;
+  font-weight: 780;
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.hosted-entry-brand p {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.hosted-repo-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.hosted-repo-form button {
+  min-height: 38px;
+  border: 1px solid var(--accent-strong);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fffefb;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 720;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    opacity 120ms ease;
+}
+
+.hosted-repo-form button:hover:not(:disabled),
+.hosted-repo-form button:focus-visible:not(:disabled) {
+  border-color: #0d4638;
+  background: var(--accent-strong);
+}
+
+.hosted-repo-form button:disabled {
+  cursor: default;
+  opacity: 0.56;
+}
+
+.hosted-entry-status {
+  min-height: 18px;
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .field,
 .filter-section {
   display: grid;

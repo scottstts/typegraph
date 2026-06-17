@@ -24,6 +24,7 @@ export type GraphStore = {
   updatedAt: string | undefined;
 
   loadGraph: () => Promise<void>;
+  setGraph: (graph: TypeGraphPayload) => void;
   applyScope: (scopePath: string | undefined) => Promise<void>;
   selectNode: (nodeId: string) => void;
   clearSelection: () => void;
@@ -93,7 +94,37 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     }
   },
 
+  setGraph: (graph) =>
+    set({
+      graph,
+      selectedNodeId: selectedIfPresent(graph, get().selectedNodeId),
+      loading: false,
+      error: undefined,
+      updatedAt: graph.indexedAt
+    }),
+
   applyScope: async (scopePath) => {
+    const currentGraph = get().graph;
+    if (currentGraph?.source?.kind === "github") {
+      const nextGraph =
+        scopePath === undefined
+          ? (() => {
+              const graph = { ...currentGraph };
+              delete graph.scopePath;
+              return graph;
+            })()
+          : { ...currentGraph, scopePath };
+
+      set({
+        graph: nextGraph,
+        selectedNodeId: selectedIfPresent(nextGraph, get().selectedNodeId),
+        loading: false,
+        error: undefined,
+        updatedAt: nextGraph.indexedAt
+      });
+      return;
+    }
+
     set({ loading: true, error: undefined });
     try {
       const response = await updateScope(scopePath);
