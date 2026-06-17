@@ -263,7 +263,7 @@ button {
 .hosted-repo-form {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 148px;
   gap: 10px 12px;
   align-items: end;
   border-top: 1px solid var(--border);
@@ -275,6 +275,8 @@ button {
 }
 
 .hosted-repo-form button {
+  justify-self: end;
+  width: 148px;
   min-height: 46px;
   border: 1px solid var(--accent-strong);
   border-radius: 999px;
@@ -316,13 +318,18 @@ button {
 }
 
 .hosted-entry-status {
+  grid-column: 2 / 3;
   display: inline-flex;
+  width: max-content;
+  max-width: 100%;
   min-height: 18px;
   align-items: center;
   justify-content: flex-end;
+  justify-self: end;
   gap: 8px;
   color: var(--muted-strong);
   text-align: right;
+  white-space: nowrap;
 }
 
 .hosted-entry-status span {
