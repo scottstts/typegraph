@@ -2,16 +2,16 @@ import {
   indexVirtualProject,
   type VirtualProjectFile,
   virtualProjectPath
-} from "../../core/indexVirtualProject.js";
-import { dirname, joinPath, normalizePath } from "../../core/pathUtils.js";
-import type { TypeGraphPayload } from "../../shared/graphTypes.js";
+} from "./indexVirtualProject.js";
+import { dirname, joinPath, normalizePath } from "./pathUtils.js";
+import type { TypeGraphPayload } from "../shared/graphTypes.js";
 import {
   parseGitHubUrl,
   resolveGitHubRefAndPath,
   type ParsedGitHubUrl
 } from "./githubUrl.js";
 
-export type HostedProgress = {
+export type GitHubRepositoryProgress = {
   message: string;
 };
 
@@ -56,7 +56,7 @@ type RepoFileEntry = {
 
 type AnalyzeGitHubRepositoryOptions = {
   input: string;
-  onProgress?: (progress: HostedProgress) => void;
+  onProgress?: (progress: GitHubRepositoryProgress) => void;
 };
 
 const apiBase = "https://api.github.com";
@@ -65,7 +65,7 @@ const declarationFilePattern = /\.d\.(cts|mts|ts|tsx)$/;
 const ignoredPathSegments = new Set(["node_modules", "dist", ".tmp"]);
 
 function progress(
-  onProgress: ((progress: HostedProgress) => void) | undefined,
+  onProgress: ((progress: GitHubRepositoryProgress) => void) | undefined,
   message: string
 ): void {
   onProgress?.({ message });

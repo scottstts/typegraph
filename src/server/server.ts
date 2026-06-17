@@ -14,7 +14,7 @@ import { registerBuiltStaticRoutes } from "./static.js";
 import { startProjectWatcher, type ProjectWatcher } from "./watch.js";
 
 type StartTypeGraphServerOptions = {
-  discovery: ProjectDiscovery;
+  discovery?: ProjectDiscovery;
   initialGraph: TypeGraphPayload;
   watch: boolean;
 };
@@ -134,7 +134,7 @@ export async function startTypeGraphServer(
     url = viteServer.url;
   }
 
-  if (options.watch) {
+  if (options.watch && options.discovery !== undefined) {
     state.watcher = startProjectWatcher({
       discovery: options.discovery,
       onGraph: state.setGraph,

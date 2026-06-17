@@ -15,7 +15,8 @@
 - Canvas node widths should remain measured from the rendered dot plus label text, not a broad minimum, because outgoing edge handles are anchored at the node's right edge and need to sit close to the type name.
 - Hover cards are rendered as a screen-space overlay from `GraphCanvas`, not inside React Flow's zoomed node DOM. Keep card sizing in normal CSS pixels and only compute its `top`/`left` from the hovered node plus the current viewport transform; do not use CSS counter-scaling for this tooltip.
 - Hosted GitHub mode is selected only by non-local browser hostnames; localhost/127.0.0.1/::1 must keep using the local Fastify API and SSE flow.
-- Hosted analysis has no backend and no GitHub auth. It uses GitHub REST for repo metadata/trees/commits, raw.githubusercontent.com pinned to the resolved commit SHA for file contents, and a Web Worker running `indexVirtualProject`.
+- Hosted analysis has no backend and no GitHub auth. Local CLI remote analysis uses the same core GitHub loader. Both use GitHub REST for repo metadata/trees/commits, raw.githubusercontent.com pinned to the resolved commit SHA for file contents, and `indexVirtualProject`.
+- CLI remote detection must require an explicit `github.com` URL. Do not treat `owner/repo` shorthand as remote in CLI mode because it collides with local relative paths such as `playground/mock-codebase`.
 - GitHub `/tree` and `/blob` refs are resolved by longest matching ref candidate because branch names can contain slashes. Invalid ref candidates can return 422 as well as 404.
 - Hosted root URLs index the repo root; hosted subdirectory URLs index only that subtree; blob URLs are treated as single-file inputs with source metadata scoped to the containing directory.
 - Do not hydrate npm/external package declarations in hosted mode unless the product direction changes. Unresolved package/library symbols should remain external terminal nodes.

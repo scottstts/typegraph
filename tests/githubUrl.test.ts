@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest";
 import {
+  isExplicitGitHubUrl,
   parseGitHubUrl,
   resolveGitHubRefAndPath
-} from "../src/web/hosted/githubUrl.js";
+} from "../src/core/githubUrl.js";
 
 describe("GitHub URL parsing", () => {
   test("parses root repository URLs", () => {
@@ -46,5 +47,12 @@ describe("GitHub URL parsing", () => {
     );
 
     expect(resolved).toEqual({ ref: "main" });
+  });
+
+  test("distinguishes explicit GitHub URLs from local paths", () => {
+    expect(isExplicitGitHubUrl("https://github.com/acme/widgets")).toBe(true);
+    expect(isExplicitGitHubUrl("github.com/acme/widgets")).toBe(true);
+    expect(isExplicitGitHubUrl("playground/mock-codebase")).toBe(false);
+    expect(isExplicitGitHubUrl("acme/widgets")).toBe(false);
   });
 });

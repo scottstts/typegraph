@@ -107,12 +107,16 @@ The watcher currently re-indexes the entire discovered project; it does not perf
 
 `tg show` runs `indexProject`, computes a summary for console output, then starts the server with `watch: true`.
 
+For explicit GitHub URL targets, `tg show` indexes through `src/core/githubRepository.ts`, starts the same local GUI server with the remote graph, and disables watch mode because there is no local filesystem project to observe.
+
 `tg index` and `tg export` use the same engine path without starting the server. `export` writes the full `TypeGraphPayload` as formatted JSON.
 
 CLI argument parsing supports:
 
 - default command `show`
 - commands `show`, `index`, and `export`
-- one optional target path
+- one optional target path or explicit `github.com` URL
 - `--project <tsconfig.json>`
 - `--out <file>` for export
+
+`--project` is local-only and should be rejected for GitHub URL targets.

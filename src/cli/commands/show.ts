@@ -1,21 +1,28 @@
-import { indexProject, summarizeGraph } from "../../core/indexProject.js";
+import { summarizeGraph } from "../../core/indexProject.js";
 import { startTypeGraphServer } from "../../server/server.js";
-import {
-  toProjectDiscoveryOptions,
-  type CliOptions
-} from "../resolveCliOptions.js";
+import { indexCliTarget } from "../indexCliTarget.js";
+import type { CliOptions } from "../resolveCliOptions.js";
 
 export async function runShowCommand(options: CliOptions): Promise<void> {
-  const { discovery, graph } = await indexProject(toProjectDiscoveryOptions(options));
+  const result = await indexCliTarget(options, (progress) => {
+    console.error(progress.message);
+  });
+  const { graph } = result;
   const summary = summarizeGraph(graph);
   const server = await startTypeGraphServer({
-    discovery,
+    ...(result.kind === "local" ? { discovery: result.discovery } : {}),
     initialGraph: graph,
-    watch: true
+    watch: result.kind === "local"
   });
 
   console.log(
     `TypeGraph indexed ${summary.typeCount} type nodes and ${summary.edgeCount} edges.`
   );
+  if (graph.source?.kind === "github") {
+    const scope = graph.source.scopePath ?? "root";
+    console.log(
+      `Source: ${graph.source.owner}/${graph.source.repo} ${graph.source.ref} (${scope})`
+    );
+  }
   console.log(`Serving explorer at ${server.url}`);
 }

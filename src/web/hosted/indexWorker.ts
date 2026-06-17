@@ -1,4 +1,4 @@
-import { analyzeGitHubRepository } from "./githubRepository.js";
+import { analyzeGitHubRepository } from "../../core/githubRepository.js";
 import type {
   HostedWorkerRequest,
   HostedWorkerResponse

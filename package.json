@@ -24,7 +24,7 @@
     "clean": "rimraf dist .tmp",
     "build": "npm run clean && npm run lint && npm run typecheck && npm run build:web && npm run build:node",
     "build:web": "vite build",
-    "build:node": "tsc -p tsconfig.node.json",
+    "build:node": "tsc -p tsconfig.node.json && node -e \"require('node:fs').chmodSync('dist/cli.js', 0o755)\"",
     "start": "node dist/cli.js"
   },
   "engines": {

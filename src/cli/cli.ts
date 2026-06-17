@@ -7,9 +7,9 @@ function printHelp(): void {
   console.log(`TypeGraph
 
 Usage:
-  tg show [path] [--project tsconfig.json]
-  tg index [path] [--project tsconfig.json]
-  tg export [path] --out typegraph.json [--project tsconfig.json]
+  tg show [path | github-url] [--project tsconfig.json]
+  tg index [path | github-url] [--project tsconfig.json]
+  tg export [path | github-url] --out typegraph.json [--project tsconfig.json]
 
 Commands:
   show     Start the local web explorer

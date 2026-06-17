@@ -42,7 +42,7 @@ Defaults are:
 
 `loadGraph` fetches `/api/graph`. `applyScope` posts to `/api/scope` for local graphs. For hosted GitHub graphs, `applyScope` only updates payload metadata client-side to avoid calling the absent local backend. Both preserve the current selection only if the selected node still exists in the returned graph.
 
-Hosted analysis is run from `src/web/hosted/indexWorker.ts`. The worker fetches public GitHub repository data, builds a virtual ts-morph project, indexes it, and returns the same `TypeGraphPayload` used by local mode.
+Hosted analysis is run from `src/web/hosted/indexWorker.ts`, which calls the shared GitHub loader in `src/core/githubRepository.ts`. The worker fetches public GitHub repository data, builds a virtual ts-morph project, indexes it, and returns the same `TypeGraphPayload` used by local mode.
 
 ## API Client
 

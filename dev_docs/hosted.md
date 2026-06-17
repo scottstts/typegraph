@@ -21,7 +21,7 @@ If no ref is present, hosted mode uses the repository default branch. For `/tree
 
 ## Repository Fetching
 
-`src/web/hosted/githubRepository.ts` uses GitHub REST API calls only. It resolves the selected ref to a commit SHA and tree SHA, then:
+`src/core/githubRepository.ts` uses GitHub REST API calls only. It is shared by the deployed web worker and local CLI remote-repository commands. It resolves the selected ref to a commit SHA and tree SHA, then:
 
 - fetches the root tree recursively for repo-root URLs.
 - walks non-recursive tree entries to a selected subtree before fetching that subtree recursively.

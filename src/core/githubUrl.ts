@@ -6,14 +6,6 @@ export type ParsedGitHubUrl = {
   url: string;
 };
 
-export type ResolvedGitHubUrl = {
-  owner: string;
-  repo: string;
-  ref: string;
-  path?: string;
-  url: string;
-};
-
 export type RefResolution = {
   ref: string;
   path?: string;
@@ -46,6 +38,15 @@ function inputToUrl(input: string): URL {
   }
 
   throw new Error("Enter a GitHub repository URL.");
+}
+
+export function isExplicitGitHubUrl(input: string | undefined): boolean {
+  if (input === undefined) {
+    return false;
+  }
+
+  const trimmed = input.trim();
+  return /^(https?:\/\/)?(www\.)?github\.com\//i.test(trimmed);
 }
 
 export function parseGitHubUrl(input: string): ParsedGitHubUrl {

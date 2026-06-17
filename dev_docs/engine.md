@@ -42,7 +42,7 @@ If no `projectPath` is supplied, discovery walks upward from the target director
 
 It also follows TypeScript project references recursively. This matters for solution-style root configs with `"files": []`: if the root project contains no non-declaration source files and has references, the first referenced config becomes the primary ts-morph project, and the rest of the referenced configs are added with `addSourceFilesFromTsConfig`.
 
-Browser-hosted analysis uses `indexVirtualProject` in `src/core/indexVirtualProject.ts`. It writes fetched repository files into ts-morph's `InMemoryFileSystemHost`, prefers a real `tsconfig.json` when one exists inside the virtual project root, creates `tsconfig.typegraph.json` otherwise, and explicitly adds all fetched TS/TSX/MTS/CTS source files. This keeps hosted analysis independent of a real filesystem while preserving the same `extractGraph` payload path.
+Browser-hosted and CLI remote GitHub analysis use `indexVirtualProject` in `src/core/indexVirtualProject.ts`. It writes fetched repository files into ts-morph's `InMemoryFileSystemHost`, prefers a real `tsconfig.json` when one exists inside the virtual project root, creates `tsconfig.typegraph.json` otherwise, and explicitly adds all fetched TS/TSX/MTS/CTS source files. This keeps remote analysis independent of a real filesystem while preserving the same `extractGraph` payload path.
 
 ## Extraction Flow
 
