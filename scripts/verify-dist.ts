@@ -47,6 +47,17 @@ if ((cliStat.mode & 0o111) === 0) {
 }
 
 const webFiles = await collectFiles(path.join(root, "dist/web"));
+const distFiles = await collectFiles(path.join(root, "dist"));
+const sourceMaps = distFiles.filter((filePath) => filePath.endsWith(".map"));
+
+if (sourceMaps.length > 0) {
+  throw new Error(
+    `Source maps must not be published:\n${sourceMaps
+      .map((filePath) => `- ${path.relative(root, filePath)}`)
+      .join("\n")}`
+  );
+}
+
 for (const filePath of webFiles) {
   if (!/\.(css|html|js|map)$/.test(filePath)) {
     continue;

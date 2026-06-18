@@ -51,6 +51,8 @@ dist/
 
 `dist/web` is local-only. It always expects the Fastify API and SSE endpoints and does not contain the hosted repository intake or browser indexing worker.
 
+The publishable `dist` tree must not contain source maps. `verify:dist` rejects any `.map` file so future npm releases cannot include them accidentally.
+
 ## Hosted Development
 
 The hosted app has a separate HTML root, React entrypoint, and Vite configuration:

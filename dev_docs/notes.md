@@ -35,3 +35,4 @@
 - The hosted intake places the npm global-install command beside the GitHub source pill using the same visual treatment; keep it static/selectable so it reads as utility text rather than a second action.
 - Hosted Vite development runs with `root: "hosted"` and requires the `/src` alias in `vite.hosted.config.ts`; keep `hosted/index.html` pointed at `/src/web/hostedMain.tsx` so dev serving does not resolve the entry under `hosted/src`.
 - The hosted npm install tag includes an accessible trailing copy button with brief check-icon feedback; keep the command text stable so copying does not cause layout movement.
+- Publishable CLI and local explorer builds do not emit source maps. `scripts/verify-dist.ts` rejects `.map` files anywhere under `dist`; the separate `dist-hosted` build is not part of the npm package.
