@@ -11,7 +11,8 @@
     "src/web/**/*.ts",
     "src/web/**/*.tsx",
     "src/shared/**/*.ts",
-    "vite.config.ts"
+    "vite.config.ts",
+    "vite.hosted.config.ts"
   ],
   "exclude": [
     "node_modules",

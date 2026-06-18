@@ -5,6 +5,7 @@ export default tseslint.config(
   {
     ignores: [
       "dist/**",
+      "dist-hosted/**",
       "node_modules/**",
       ".tmp/**",
       "playground/mock-codebase/**",
@@ -21,7 +22,8 @@ export default tseslint.config(
         project: [
           "./tsconfig.node.json",
           "./tsconfig.web.json",
-          "./tsconfig.test.json"
+          "./tsconfig.test.json",
+          "./tsconfig.tools.json"
         ],
         tsconfigRootDir: import.meta.dirname
       }

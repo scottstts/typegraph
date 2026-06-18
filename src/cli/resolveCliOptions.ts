@@ -21,7 +21,7 @@ function readFlagValue(args: string[], index: number, flag: string): string {
 }
 
 export function parseCliArgs(args: string[]): CliOptions {
-  if (args.includes("--help") || args.includes("-h")) {
+  if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
     return {
       command: "show",
       help: true

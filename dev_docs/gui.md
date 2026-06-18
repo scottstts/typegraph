@@ -1,10 +1,12 @@
 # GUI
 
-The GUI lives in `src/web` and is a Vite React application. It consumes the local Fastify API, stores the current graph in Zustand, and renders a whole-project dependency canvas with side panels for search/filtering and inspection.
+The GUI lives in `src/web` and is a Vite React application. The npm/CLI build consumes the local Fastify API, stores the current graph in Zustand, and renders a whole-project dependency canvas with side panels for search/filtering and inspection.
 
 ## Application Shell
 
-`src/web/App.tsx` chooses runtime mode by browser hostname. Localhost, `127.0.0.1`, and `::1` keep the local API-backed behavior. Non-local origins show the hosted GitHub repository intake first, then render the same three-column shell after browser-side indexing completes.
+`src/web/App.tsx` is the local-only entry used by the npm package. It always loads `/api/graph` and subscribes to `/api/events`. The reusable three-column shell lives in `src/web/ExplorerApp.tsx`.
+
+The separately built hosted app uses `src/web/hostedMain.tsx` and `src/web/hosted/HostedApp.tsx`. It shows the GitHub repository intake first, then renders the same `ExplorerApp` shell after browser-side indexing completes.
 
 The three-column shell contains:
 
@@ -12,7 +14,7 @@ The three-column shell contains:
 - central graph canvas
 - right inspector panel
 
-The left and right panels are resizable within fixed min/max widths and can be collapsed from buttons inside the canvas. In local mode, the app loads the graph on mount and opens an `EventSource` to `/api/events`; every `graph-update` event triggers a full graph reload. Hosted mode does not call local API endpoints.
+The left and right panels are resizable within fixed min/max widths and can be collapsed from buttons inside the canvas. The local app loads the graph on mount and opens an `EventSource` to `/api/events`; every `graph-update` event triggers a full graph reload. Hosted mode does not call local API endpoints.
 
 Below 900px, the shell becomes a stacked mobile workspace: search/filter controls, canvas, then inspector. Mobile rows should be content-driven for the panels and fixed/min-height for the canvas; do not use fixed panel rows that allow the search panel to overflow into the graph.
 

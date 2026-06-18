@@ -7,6 +7,30 @@ import { useGraphStore } from "../state/graphStore.js";
 
 const exampleUrl = "https://github.com/microsoft/TypeScript";
 const sourceUrl = "https://github.com/scottstts/typegraph";
+const installCommand = "npm i -g @scottstts/typegraph";
+type CopyStatus = "idle" | "copied" | "failed";
+
+async function writeClipboard(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.append(textarea);
+    textarea.select();
+
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- Clipboard API permission fallback.
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    if (!copied) {
+      throw new Error("Could not copy the install command.");
+    }
+  }
+}
 
 export function HostedRepositoryEntry() {
   const setGraph = useGraphStore((state) => state.setGraph);
@@ -14,8 +38,10 @@ export function HostedRepositoryEntry() {
   const [status, setStatus] = useState("Waiting for repository URL");
   const [error, setError] = useState<string | undefined>();
   const [running, setRunning] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
   const workerRef = useRef<Worker | undefined>(undefined);
   const requestIdRef = useRef(0);
+  const copyResetTimerRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     document.body.classList.add("hosted-entry-active");
@@ -23,8 +49,28 @@ export function HostedRepositoryEntry() {
     return () => {
       document.body.classList.remove("hosted-entry-active");
       workerRef.current?.terminate();
+      if (copyResetTimerRef.current !== undefined) {
+        window.clearTimeout(copyResetTimerRef.current);
+      }
     };
   }, []);
+
+  async function copyInstallCommand(): Promise<void> {
+    try {
+      await writeClipboard(installCommand);
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("failed");
+    }
+
+    if (copyResetTimerRef.current !== undefined) {
+      window.clearTimeout(copyResetTimerRef.current);
+    }
+    copyResetTimerRef.current = window.setTimeout(() => {
+      setCopyStatus("idle");
+      copyResetTimerRef.current = undefined;
+    }, 1800);
+  }
 
   function startAnalysis(event: SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -81,16 +127,51 @@ export function HostedRepositoryEntry() {
     <main className="hosted-entry-shell">
       <section className="hosted-entry" aria-labelledby="hosted-entry-title">
         <div className="hosted-entry-copy">
-          <a
-            className="hosted-source-link"
-            href={sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Open TypeGraph source repository on GitHub"
-          >
-            <i className="fa-brands fa-github" aria-hidden="true" />
-            <span>TypeGraph</span>
-          </a>
+          <div className="hosted-entry-actions">
+            <a
+              className="hosted-action-tag hosted-source-link"
+              href={sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open TypeGraph source repository on GitHub"
+            >
+              <i className="fa-brands fa-github" aria-hidden="true" />
+              <span>TypeGraph</span>
+            </a>
+            <div className="hosted-action-tag hosted-install-tag">
+              <code>{installCommand}</code>
+              <button
+                type="button"
+                className={copyStatus === "idle" ? undefined : copyStatus}
+                aria-label={
+                  copyStatus === "copied"
+                    ? "Install command copied"
+                    : copyStatus === "failed"
+                      ? "Could not copy install command"
+                      : "Copy install command"
+                }
+                title={
+                  copyStatus === "copied"
+                    ? "Copied"
+                    : copyStatus === "failed"
+                      ? "Copy failed"
+                      : "Copy install command"
+                }
+                onClick={() => void copyInstallCommand()}
+              >
+                <i
+                  className={
+                    copyStatus === "copied"
+                      ? "fa-solid fa-check"
+                      : copyStatus === "failed"
+                        ? "fa-solid fa-xmark"
+                        : "fa-regular fa-copy"
+                  }
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+          </div>
 
           <p className="hosted-entry-kicker">Public GitHub intake</p>
           <h1 id="hosted-entry-title">TypeGraph</h1>

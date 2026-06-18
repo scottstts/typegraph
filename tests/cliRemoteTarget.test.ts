@@ -3,6 +3,23 @@ import { indexCliTarget } from "../src/cli/indexCliTarget.js";
 import { parseCliArgs } from "../src/cli/resolveCliOptions.js";
 
 describe("CLI remote targets", () => {
+  test("shows help when invoked without arguments", () => {
+    expect(parseCliArgs([])).toEqual({
+      command: "show",
+      help: true
+    });
+  });
+
+  test.each([["--help"], ["-h"]])(
+    "shows help for the %s flag",
+    (...args) => {
+      expect(parseCliArgs(args)).toEqual({
+        command: "show",
+        help: true
+      });
+    }
+  );
+
   test("accepts explicit GitHub URLs as command targets", () => {
     expect(
       parseCliArgs([

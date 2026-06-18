@@ -25,7 +25,7 @@ In development, `show` starts:
 
 The dev GUI preferred port is `5174`, with Vite allowed to choose another port.
 
-In built runtime, Fastify serves the static GUI from `dist/web` through `@fastify/static`. Non-API misses fall back to `index.html`, so the GUI can handle client-side routes if they are added later. `/api/*` misses return JSON 404 responses.
+In built runtime, Fastify serves the local-only static GUI from `dist/web` through `@fastify/static`. Hosted intake and browser-worker code are built separately and are not included in the npm artifact. Non-API misses fall back to `index.html`, so the GUI can handle client-side routes if they are added later. `/api/*` misses return JSON 404 responses.
 
 ## Mutable Graph State
 
@@ -113,7 +113,8 @@ For explicit GitHub URL targets, `tg show` indexes through `src/core/githubRepos
 
 CLI argument parsing supports:
 
-- default command `show`
+- help output for zero arguments, `--help`, and `-h`
+- default command `show` when a target is supplied without a command
 - commands `show`, `index`, and `export`
 - one optional target path or explicit `github.com` URL
 - `--project <tsconfig.json>`

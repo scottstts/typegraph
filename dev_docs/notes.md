@@ -25,3 +25,13 @@
 - Mobile/coarse-pointer node selection should not animate or force zoom to `1`; center at the current zoom instead. The full animated selected-node zoom is desktop-only because touch-triggered large React Flow transforms can cause mobile browser reloads.
 - Mobile/coarse-pointer canvas interaction must avoid hover-driven graph decoration, selection-driven full graph decoration, and unnecessary recentering. Use React Flow visible-element rendering on compact canvases, pass the base layout through unchanged for compact selections, and only center compact selections when the selected node is not already visible; this keeps hosted mobile browsers from doing large DOM/SVG transform work while users tap nodes.
 - Inspector selection should reuse a graph-level node lookup instead of rebuilding `Map(graph.nodes)` inside declaration/reference and relationship-list rendering. Hosted mobile crashes can show up as silent page reloads with no console error when selection creates large short-lived maps for big graphs.
+
+2026-06-18:
+- The publishable npm package is `@scottstts/typegraph`; installed binaries remain `typegraph` and `tg`.
+- The npm build is local-only: `src/web/App.tsx` always uses Fastify API/SSE and renders the shared `ExplorerApp`. Hosted intake/worker code has its own `hosted/` HTML root, `src/web/hostedMain.tsx`, and `vite.hosted.config.ts`, producing `dist-hosted` via `npm run build:hosted`.
+- Keep browser UI libraries in `devDependencies` because Vite bundles them into `dist/web`. Installed CLI runtime dependencies are `fastify`, `@fastify/static`, `chokidar`, and `ts-morph`.
+- Bare `typegraph`/`tg` invocations are informational and print the same command help as `--help`/`-h`; functional work requires a command or target argument.
+- `dev_docs/dev.md` is the source of truth for local CLI versus hosted development, build outputs, deployment configuration, and publish validation commands.
+- The hosted intake places the npm global-install command beside the GitHub source pill using the same visual treatment; keep it static/selectable so it reads as utility text rather than a second action.
+- Hosted Vite development runs with `root: "hosted"` and requires the `/src` alias in `vite.hosted.config.ts`; keep `hosted/index.html` pointed at `/src/web/hostedMain.tsx` so dev serving does not resolve the entry under `hosted/src`.
+- The hosted npm install tag includes an accessible trailing copy button with brief check-icon feedback; keep the command text stable so copying does not cause layout movement.

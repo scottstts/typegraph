@@ -1,44 +1,66 @@
 # TypeGraph
 
-TypeGraph explores the TypeScript type structure of a codebase. It parses local projects or public GitHub repositories, discovers type aliases, interfaces, function type aliases, classes/enums where relevant, and builds a navigable type dependency graph that can be inspected in a web GUI or exported as JSON.
+Explore the TypeScript type structure of a local project or public GitHub repository as an interactive dependency graph.
 
-![TypeGraph](./assets/screenshot.jpeg)
+## Run without installing
 
-## Dev
+```sh
+npx @scottstts/typegraph show .
+```
+
+## Install globally
+
+```sh
+npm install --global @scottstts/typegraph
+
+typegraph show .
+typegraph export . --out typegraph.json
+```
+
+The shorter `tg` binary is also available after installation.
+
+## Analyze a public GitHub repository
+
+```sh
+typegraph show https://github.com/owner/repo
+typegraph export https://github.com/owner/repo --out typegraph.json
+```
+
+Repository root, branch, subdirectory, and blob URLs are supported. GitHub targets must be explicit `github.com` URLs.
+
+## Commands
+
+```text
+typegraph
+typegraph --help
+typegraph show [path | github-url] [--project tsconfig.json]
+typegraph index [path | github-url] [--project tsconfig.json]
+typegraph export [path | github-url] [--out typegraph.json] [--project tsconfig.json]
+```
+
+- With no arguments, TypeGraph prints the available commands and options.
+- `--help` and `-h` print the same help output.
+- `show` indexes the target and starts the local web explorer.
+- `index` prints a graph summary.
+- `export` writes the complete graph as JSON. The default output is `typegraph.json`.
+- `--project` selects a TypeScript config for local filesystem targets only.
+
+Supplying a path or GitHub URL without a command still defaults to `show`.
+
+## Requirements
+
+- Node.js 20 or newer
+- A TypeScript project with a discoverable `tsconfig.json`, unless analyzing a GitHub repository
+
+## Local development
 
 ```sh
 npm install
-npm run test
+npm test
 npm run lint
 npm run typecheck
-npm run dev:mock              # index and open GUI on mock codebase inside playground/
-npm run dev -- show <path>    # index and open GUI on another TypeScript project
-npm run dev -- show <github-repo-url>  # index and open GUI on a public GitHub TS repo
-npm run dev -- export <path> --out graph.json  # index and export type graph as json
-npm run dev -- export <github-repo-url> --out graph.json
-```
-
-## Local CLI Usage
-
-```sh
 npm run build
-npm link                 # (optional) link tg/typegraph CLI from this repo
-
-npm run start -- show <path>
-npm run start -- export <path> --out graph.json
-npm run start -- show <github-repo-url>
-npm run start -- export <github-repo-url> --out graph.json
-
-# or after linking run:
-tg show <path>
-tg export <path> --out graph.json
-tg show <github-repo-url>
-tg export <github-repo-url> --out graph.json
+npm run dev:mock
 ```
 
-**Note:** GitHub targets must be explicit `github.com` URLs. `--project <tsconfig.json>` is only for local filesystem targets.
-
-## Deployed Web App
-
-A deployed version of TypeGraph web app at: https://tg.scottsun.io
-Use this directly in browser for any public GitHub TS repos
+The npm package build contains the CLI, local server, graph engine, and local explorer. The separate hosted browser app is at: [TypeGraph](https://tg.scottsun.io)
